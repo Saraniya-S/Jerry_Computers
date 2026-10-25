@@ -107,7 +107,7 @@ export function ServicesSection() {
               >
                 <div className="absolute inset-[-130%] rounded-full bg-[radial-gradient(closest-side,var(--mark-glow),rgb(233_162_95/0.14)_45%,transparent)]" />
                 <motion.div style={{ rotateY: markSpin }}>
-                  <LogoMark className="relative size-36 text-[var(--mark)] drop-shadow-[0_0_44px_var(--mark-glow)]" />
+                  <LogoMark className="relative size-40 drop-shadow-[0_0_44px_var(--mark-glow)]" />
                 </motion.div>
               </motion.div>
             )}

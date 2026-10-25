@@ -19,6 +19,10 @@ npm run lint
 
 Routes `/services/request`, `/account` and `/products/[slug]` are placeholders that say plainly the booking, accounts and ordering features are not live yet.
 
+## Brand
+
+The JR badge is a vector trace of the supplied logo (`docs/reference/brand/jr-logo-original.webp`), recoloured to the copper palette. It lives in `src/components/ui/Logo.tsx` (`brandColors`, `JR_PATHS`), with `src/app/icon.svg`, `src/app/apple-icon.png` and `public/brand-jr.svg` generated from the same paths.
+
 ## Homepage structure
 
 `src/components/home/*` — one component per section:

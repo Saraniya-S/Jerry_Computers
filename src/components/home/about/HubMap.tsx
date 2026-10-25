@@ -82,7 +82,7 @@ export function HubMap() {
       <div className="absolute left-1/2 top-1/2 flex -translate-1/2 flex-col items-center">
         <div className="relative grid size-24 place-items-center rounded-3xl border border-line-strong bg-gradient-to-b from-ink-700 to-ink-850 shadow-[0_20px_60px_-10px_rgb(192_106_43/0.45)] sm:size-28">
           <span aria-hidden className="absolute inset-0 rounded-3xl border border-copper/30 motion-safe:[animation:pulse-ring_3.2s_ease-out_infinite]" />
-          <LogoMark className="size-11 text-fg" />
+          <LogoMark className="size-16 sm:size-[4.5rem]" />
         </div>
         <span className="mt-3 font-mono text-[0.62rem] uppercase tracking-[0.2em] text-fg-muted">Jerry hub</span>
       </div>
