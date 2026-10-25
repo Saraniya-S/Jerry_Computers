@@ -156,6 +156,11 @@ body {
   display: block;
 }
 
+/* Why Choose Us: darken stacked cards in dark mode only; a light veil reads as frosted glass. */
+[data-theme="light"] .stack-veil {
+  display: none;
+}
+
 .text-balance {
   text-wrap: balance;
 }

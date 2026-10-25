@@ -95,7 +95,7 @@ function StackCard({ reason, index, total, progress, rich }: { reason: Reason; i
           </ul>
         </div>
         <div data-theme="dark" className="relative min-h-[260px] overflow-hidden rounded-[20px] border border-white/[0.08] bg-[#0e0b09]">{reason.visual}</div>
-        {rich && <motion.div aria-hidden style={{ opacity: dim }} className="pointer-events-none absolute inset-0 rounded-[28px] bg-ink-950" />}
+        {rich && <motion.div aria-hidden style={{ opacity: dim }} className="stack-veil pointer-events-none absolute inset-0 rounded-[28px] bg-black" />}
       </motion.article>
     </li>
   );
