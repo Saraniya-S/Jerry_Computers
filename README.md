@@ -1,36 +1,31 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Jerry Computers — storefront
 
-## Getting Started
-
-First, run the development server:
+Next.js 16 (App Router) + TypeScript + Tailwind CSS v4 + Motion. Palette: warm graphite with copper accents, with dark and light themes (tokens in `src/app/globals.css`; `[data-theme]` scopes them, so a section can force `data-theme="dark"`). The theme follows the OS until the visitor uses the sun/moon toggle; the choice is saved in `localStorage` and applied before first paint by `src/lib/themeScript.ts`.
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm run dev     # http://localhost:3000
+npm run build
+npm run lint
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Before launch: fill in real business details
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+| What | Where |
+| --- | --- |
+| Address, map link, phone, email, hours, social links | `src/config/site.ts` (every `null` is unknown — the UI shows "To be confirmed") |
+| Product catalogue | `src/data/products.ts` — currently a clearly marked **demonstration** catalogue, prices `null` ("Price on enquiry"). Replace `getFeaturedProducts()` with a database query. Add `image` to a product to use a photo instead of the built-in artwork. |
+| Services | `src/data/services.ts` |
+| Policy text | `src/app/policies/[slug]/page.tsx` (placeholder notice until content is approved) |
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Routes `/services/request`, `/account` and `/products/[slug]` are placeholders that say plainly the booking, accounts and ordering features are not live yet.
 
-## Learn More
+## Homepage structure
 
-To learn more about Next.js, take a look at the following resources:
+`src/components/home/*` — one component per section:
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- **Hero** — looping background video per theme: `hero-1080.mp4` / `hero-720.mp4` (dark) and `hero-light-1080.mp4` / `hero-light-720.mp4` (light), each with a poster. Both are crossfaded into seamless loops (originals in `docs/reference/`). CSS (`.theme-dark-only` / `.theme-light-only`) shows the right one from first paint and only the visible one plays; pauses off-screen / in background tabs, stays on the poster under reduced motion, and has a pause button.
+- **About** — hub-and-orbit integration map.
+- **Services** — cards orbit the glowing Jerry mark on a tilted ring (upright, nearer cards larger and on top), then fold into the grid as you scroll; widgets animate with CSS. Only at ≥1024×820 with motion allowed; a static grid otherwise.
+- **Why choose us** — sticky stacking cards + scroll-lit word reveal.
+- **Products** — CSS-3D double helix (`src/components/products/helix`), simplified two-strand carousel on touch / small screens / reduced motion.
+- **Contact** and **Footer** read everything from `site.ts`.

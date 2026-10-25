@@ -1,26 +1,233 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+:root,
+[data-theme="dark"] {
+  color-scheme: dark;
+  --ink-950: #0b0908;
+  --ink-900: #110e0c;
+  --ink-850: #161210;
+  --ink-800: #1d1814;
+  --ink-700: #28211b;
+  --line: rgb(255 255 255 / 0.08);
+  --line-strong: rgb(255 255 255 / 0.14);
+  --fg: #f4efe8;
+  --fg-muted: #a89f94;
+  --fg-dim: #70675e;
+  --copper: #e9a25f;
+  --copper-deep: #c06a2b;
+  --copper-hover: #f3bb84;
+  --copper-glow: rgb(233 162 95 / 0.35);
+  /* Semantic surfaces */
+  --card-top: #201b17;
+  --card-bottom: #161210;
+  --card-edge: rgb(255 255 255 / 0.12);
+  --stack-a: #2e2620;
+  --stack-b: #1f1a16;
+  --stack-c: #151210;
+  --art-a: #2a2019;
+  --art-b: #0e0b09;
+  --inset: rgb(0 0 0 / 0.25);
+  --track: rgb(255 255 255 / 0.1);
+  --shadow: rgb(0 0 0 / 0.85);
+  --highlight: rgb(255 255 255 / 0.06);
+  --spot: rgb(255 255 255 / 0.08);
+  --mark: #ffffff;
+  --mark-glow: rgb(255 255 255 / 0.5);
+  --why-a: #0d0b0a;
+  --why-b: #0f0c0a;
+  --why-c: #090706;
+  --helix-glow: #22160d;
+  --helix-base: #080605;
+  --wordmark: rgb(255 255 255 / 0.09);
+  --nav-h: 72px;
+}
+
+[data-theme="light"] {
+  color-scheme: light;
+  --ink-950: #f6f2ec;
+  --ink-900: #efe9e1;
+  --ink-850: #fffdf9;
+  --ink-800: #e7dfd4;
+  --ink-700: #d9cfc2;
+  --line: rgb(45 28 12 / 0.1);
+  --line-strong: rgb(45 28 12 / 0.18);
+  --fg: #1c1712;
+  --fg-muted: #5f564c;
+  --fg-dim: #8b8177;
+  --copper: #a95a22;
+  --copper-deep: #8a4416;
+  --copper-hover: #8f4a1a;
+  --copper-glow: rgb(169 90 34 / 0.25);
+  --card-top: #ffffff;
+  --card-bottom: #f8f3ec;
+  --card-edge: rgb(45 28 12 / 0.12);
+  --stack-a: #fffaf4;
+  --stack-b: #f5ede3;
+  --stack-c: #ede3d6;
+  --art-a: #f4ede4;
+  --art-b: #e2d7c9;
+  --inset: rgb(60 40 20 / 0.05);
+  --track: rgb(60 40 20 / 0.12);
+  --shadow: rgb(90 60 30 / 0.22);
+  --highlight: rgb(255 255 255 / 0.8);
+  --spot: rgb(255 255 255 / 0.9);
+  --mark: #1c1712;
+  --mark-glow: rgb(233 162 95 / 0.55);
+  --why-a: #efe9e1;
+  --why-b: #f3ede5;
+  --why-c: #f6f2ec;
+  --helix-glow: #fbf3e8;
+  --helix-base: #efe7dc;
+  --wordmark: rgb(45 28 12 / 0.08);
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
+  --color-ink-950: var(--ink-950);
+  --color-ink-900: var(--ink-900);
+  --color-ink-850: var(--ink-850);
+  --color-ink-800: var(--ink-800);
+  --color-ink-700: var(--ink-700);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-fg: var(--fg);
+  --color-fg-muted: var(--fg-muted);
+  --color-fg-dim: var(--fg-dim);
+  --color-copper: var(--copper);
+  --color-copper-deep: var(--copper-deep);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+  --font-serif: var(--font-instrument-serif);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html {
+  scroll-behavior: smooth;
+  scroll-padding-top: calc(var(--nav-h) + 16px);
+  background: var(--ink-950);
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--ink-950);
+  color: var(--fg);
+  font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  overflow-x: clip;
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+::selection {
+  background: var(--copper);
+  color: var(--ink-950);
+}
+
+:focus-visible {
+  outline: 2px solid var(--copper);
+  outline-offset: 3px;
+  border-radius: 6px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Fine noise used behind sections */
+.grain::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.05;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+}
+
+/* Theme-specific media (e.g. hero videos). data-theme is set before first paint. */
+.theme-light-only,
+[data-theme="light"] .theme-dark-only {
+  display: none;
+}
+[data-theme="light"] .theme-light-only {
+  display: block;
+}
+
+.text-balance {
+  text-wrap: balance;
+}
+
+.mask-fade-x {
+  mask-image: linear-gradient(90deg, transparent, #000 12%, #000 88%, transparent);
+}
+
+@keyframes pulse-ring {
+  0% {
+    transform: scale(0.85);
+    opacity: 0.6;
+  }
+  100% {
+    transform: scale(1.6);
+    opacity: 0;
+  }
+}
+
+@keyframes orbit-dash {
+  to {
+    stroke-dashoffset: -200;
+  }
+}
+
+@keyframes lane-sweep {
+  0% {
+    transform: translateX(-30%);
+  }
+  100% {
+    transform: translateX(130%);
+  }
+}
+
+@keyframes bar-fill {
+  0%,
+  100% {
+    transform: scaleX(0.35);
+  }
+  50%,
+  70% {
+    transform: scaleX(1);
+  }
+}
+
+@keyframes toggle-knob {
+  0%,
+  45% {
+    left: 0.125rem;
+  }
+  55%,
+  100% {
+    left: 0.875rem;
+  }
+}
+
+@keyframes toggle-track {
+  0% {
+    background: var(--track);
+  }
+  50% {
+    background: var(--copper);
+  }
+}
+
+@keyframes ring-charge {
+  0%,
+  100% {
+    stroke-dashoffset: 120;
+  }
+  60%,
+  80% {
+    stroke-dashoffset: 30;
+  }
 }
