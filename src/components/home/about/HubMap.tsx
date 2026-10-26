@@ -20,8 +20,8 @@ export function HubMap() {
       <svg viewBox="0 0 100 100" className="absolute inset-0 size-full" aria-hidden>
         <defs>
           <radialGradient id="hub-fade" cx="50%" cy="50%" r="50%">
-            <stop offset="0" stopColor="#e9a25f" stopOpacity="0.14" />
-            <stop offset="1" stopColor="#e9a25f" stopOpacity="0" />
+            <stop offset="0" stopColor="#2f6b22" stopOpacity="0.14" />
+            <stop offset="1" stopColor="#2f6b22" stopOpacity="0" />
           </radialGradient>
         </defs>
         <circle cx="50" cy="50" r="48" fill="url(#hub-fade)" />
@@ -33,7 +33,7 @@ export function HubMap() {
           cy="50"
           r={radius}
           fill="none"
-          stroke="var(--copper)" strokeOpacity="0.55"
+          stroke="var(--brand)" strokeOpacity="0.55"
           strokeWidth="0.3"
           strokeDasharray="1.2 6"
           className="motion-safe:[animation:orbit-dash_14s_linear_infinite]"
@@ -71,7 +71,7 @@ export function HubMap() {
           return (
             <span
               key={i}
-              className="absolute size-1.5 -translate-1/2 rounded-full bg-copper shadow-[0_0_12px_2px_rgb(233_162_95/0.7)]"
+              className="absolute size-1.5 -translate-1/2 rounded-full bg-brand shadow-[0_0_12px_2px_rgb(47_107_34/0.45)]"
               style={{ left: `${r2(50 + Math.cos(a) * radius)}%`, top: `${r2(50 + Math.sin(a) * radius)}%` }}
             />
           );
@@ -80,8 +80,8 @@ export function HubMap() {
 
       {/* Hub */}
       <div className="absolute left-1/2 top-1/2 flex -translate-1/2 flex-col items-center">
-        <div className="relative grid size-24 place-items-center rounded-3xl border border-line-strong bg-gradient-to-b from-ink-700 to-ink-850 shadow-[0_20px_60px_-10px_rgb(192_106_43/0.45)] sm:size-28">
-          <span aria-hidden className="absolute inset-0 rounded-3xl border border-copper/30 motion-safe:[animation:pulse-ring_3.2s_ease-out_infinite]" />
+        <div className="relative grid size-24 place-items-center rounded-3xl border border-line-strong bg-gradient-to-b from-ink-700 to-ink-850 shadow-[0_20px_60px_-10px_rgb(55_47_99/0.25)] sm:size-28">
+          <span aria-hidden className="absolute inset-0 rounded-3xl border border-brand/30 motion-safe:[animation:pulse-ring_3.2s_ease-out_infinite]" />
           <LogoMark className="size-16 sm:size-[4.5rem]" />
         </div>
         <span className="mt-3 font-mono text-[0.62rem] uppercase tracking-[0.2em] text-fg-muted">Jerry hub</span>

@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 export function Eyebrow({ children, className = "" }: { children: ReactNode; className?: string }) {
   return (
     <p className={`flex items-center gap-2 font-mono text-[0.72rem] uppercase tracking-[0.18em] text-fg-muted ${className}`}>
-      <span aria-hidden className="h-px w-5 bg-copper" />
+      <span aria-hidden className="h-px w-5 bg-brand" />
       {children}
     </p>
   );

@@ -27,12 +27,12 @@ export function ProductCard({ product, interactive = true, className = "" }: Pro
         <p className="mt-1 text-[0.95rem] font-medium leading-snug tracking-tight text-fg">{product.name}</p>
         <div className="mt-auto flex items-center justify-between pt-2.5">
           <span className="text-[0.78rem] text-fg-muted">{formatPrice(product.price)}</span>
-          <ArrowUpRight className="size-4 text-fg-muted transition-colors group-hover:text-copper" aria-hidden />
+          <ArrowUpRight className="size-4 text-fg-muted transition-colors group-hover:text-brand" aria-hidden />
         </div>
       </div>
     </>
   );
-  const cls = `group flex h-full flex-col rounded-2xl border border-[var(--card-edge)] bg-[linear-gradient(180deg,var(--card-top),var(--card-bottom))] p-2.5 shadow-[0_20px_50px_-20px_var(--shadow),inset_0_1px_0_var(--highlight)] transition-colors hover:border-copper/50 ${className}`;
+  const cls = `group flex h-full flex-col rounded-2xl border border-[var(--card-edge)] bg-[linear-gradient(180deg,var(--card-top),var(--card-bottom))] p-2.5 shadow-[0_20px_50px_-20px_var(--shadow),inset_0_1px_0_var(--highlight)] transition-colors hover:border-brand/50 ${className}`;
 
   if (!interactive) {
     return (

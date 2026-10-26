@@ -45,7 +45,7 @@ export function AboutSection() {
         <ol className="grid border-t border-line md:grid-cols-3">
           {pillars.map((p, i) => (
             <Reveal as="li" key={p.k} delay={i * 0.08} className="border-b border-line py-8 md:border-b-0 md:border-l md:px-8 md:first:border-l-0 md:first:pl-0">
-              <p className="font-mono text-[0.7rem] uppercase tracking-[0.18em] text-copper">
+              <p className="font-mono text-[0.7rem] uppercase tracking-[0.18em] text-brand">
                 0{i + 1} — {p.k}
               </p>
               <h3 className="mt-4 text-xl font-medium tracking-tight text-fg">{p.title}</h3>

@@ -14,7 +14,7 @@ export function ContactSection() {
 
   return (
     <section id="contact" aria-labelledby="contact-title" className="relative overflow-hidden border-t border-line bg-ink-950 py-24 sm:py-32">
-      <div aria-hidden className="pointer-events-none absolute -left-40 top-20 h-[420px] w-[620px] rounded-full bg-[radial-gradient(closest-side,rgb(192_106_43/0.14),transparent)]" />
+      <div aria-hidden className="pointer-events-none absolute -left-40 top-20 h-[420px] w-[620px] rounded-full bg-[radial-gradient(closest-side,rgb(184_220_181/0.45),transparent)]" />
       <div className="relative mx-auto grid max-w-[1320px] gap-14 px-5 sm:px-8 lg:grid-cols-[1.1fr_1fr] lg:gap-20">
         <Reveal>
           <Eyebrow>Contact</Eyebrow>
@@ -42,14 +42,14 @@ export function ContactSection() {
             <Detail icon={MapPin} label="Shop location">
               {c.address ? <span className="whitespace-pre-line">{c.address}</span> : pending}
               {c.mapUrl && (
-                <a href={c.mapUrl} target="_blank" rel="noopener noreferrer" className="mt-2 inline-flex items-center gap-1 text-sm text-copper hover:underline">
+                <a href={c.mapUrl} target="_blank" rel="noopener noreferrer" className="mt-2 inline-flex items-center gap-1 text-sm text-brand hover:underline">
                   Open in maps <ArrowUpRight className="size-3.5" aria-hidden />
                 </a>
               )}
             </Detail>
             <Detail icon={Phone} label="Phone">
               {c.phone ? (
-                <a href={telHref(c.phone)} className="hover:text-copper">
+                <a href={telHref(c.phone)} className="hover:text-brand">
                   {c.phone}
                 </a>
               ) : (
@@ -58,7 +58,7 @@ export function ContactSection() {
             </Detail>
             <Detail icon={Mail} label="Email">
               {c.email ? (
-                <a href={`mailto:${c.email}`} className="hover:text-copper">
+                <a href={`mailto:${c.email}`} className="hover:text-brand">
                   {c.email}
                 </a>
               ) : (
@@ -103,10 +103,10 @@ function Detail({ icon: Icon, label, children }: { icon: LucideIcon; label: stri
 function EnquiryCard({ icon: Icon, title, body, href, cta }: { icon: LucideIcon; title: string; body: string; href: string | null; cta: string }) {
   const inner = (
     <>
-      <Icon className="size-5 text-copper" aria-hidden />
+      <Icon className="size-5 text-brand" aria-hidden />
       <p className="mt-6 text-lg font-medium tracking-tight text-fg">{title}</p>
       <p className="mt-1.5 text-sm leading-relaxed text-fg-muted">{body}</p>
-      <p className={`mt-6 inline-flex items-center gap-1.5 text-sm font-medium ${href ? "text-fg group-hover:text-copper" : "text-fg-dim"}`}>
+      <p className={`mt-6 inline-flex items-center gap-1.5 text-sm font-medium ${href ? "text-fg group-hover:text-brand" : "text-fg-dim"}`}>
         {cta} {href && <ArrowUpRight className="size-4" aria-hidden />}
       </p>
     </>

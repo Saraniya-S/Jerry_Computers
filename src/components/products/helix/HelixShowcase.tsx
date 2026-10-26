@@ -90,7 +90,7 @@ export function HelixShowcase({ products }: { products: Product[] }) {
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
             >
-              <p className="font-mono text-[0.7rem] uppercase tracking-[0.18em] text-copper">
+              <p className="font-mono text-[0.7rem] uppercase tracking-[0.18em] text-brand">
                 {String(focus + 1).padStart(2, "0")} / {String(products.length).padStart(2, "0")} · {getCategory(current.category).label}
               </p>
               <h3 className="mt-4 text-4xl font-medium tracking-[-0.03em] text-fg">{current.name}</h3>
@@ -132,7 +132,7 @@ export function HelixShowcase({ products }: { products: Product[] }) {
               style={{ transform: `rotateZ(-7deg) scale(${veryShort ? 0.72 : short ? 0.84 : 1})` }}
             >
               {/* Axis glow */}
-              <div className="absolute left-1/2 top-1/2 h-[140vh] w-px -translate-1/2 bg-gradient-to-b from-transparent via-copper/30 to-transparent" />
+              <div className="absolute left-1/2 top-1/2 h-[140vh] w-px -translate-1/2 bg-gradient-to-b from-transparent via-brand/30 to-transparent" />
               {rungs.map((t) => (
                 <Rung key={t} tau={t} f={f} />
               ))}
@@ -146,7 +146,7 @@ export function HelixShowcase({ products }: { products: Product[] }) {
           <div className="relative z-20 hidden justify-self-end text-right xl:block">
             <p className="font-mono text-[0.65rem] uppercase tracking-[0.18em] text-fg-dim">Scroll to turn</p>
             <div className="ml-auto mt-3 h-28 w-px overflow-hidden bg-line">
-              <motion.div style={{ scaleY: smooth }} className="h-full w-full origin-top bg-copper" />
+              <motion.div style={{ scaleY: smooth }} className="h-full w-full origin-top bg-brand" />
             </div>
           </div>
         </div>
@@ -176,7 +176,7 @@ function HelixCard({ product, index, f, focused }: { product: Product; index: nu
       style={{ transform, opacity, pointerEvents, width: CARD_W, height: CARD_H }}
       className="absolute left-0 top-0 [backface-visibility:hidden] will-change-transform"
     >
-      <div className={`h-full rounded-2xl transition-shadow duration-300 ${focused ? "shadow-[0_0_0_1px_rgb(233_162_95/0.6),0_0_50px_-6px_rgb(233_162_95/0.45)]" : ""}`}>
+      <div className={`h-full rounded-2xl transition-shadow duration-300 ${focused ? "shadow-[0_0_0_1px_rgb(55_47_99/0.6),0_0_50px_-6px_rgb(55_47_99/0.45)]" : ""}`}>
         <ProductCard product={product} interactive={false} />
       </div>
     </motion.div>
@@ -194,9 +194,9 @@ function Rung({ tau, f }: { tau: number; f: MotionValue<number> }) {
   });
   return (
     <motion.div style={{ transform, opacity, width: cfg.radius * 2 }} className="absolute left-0 top-0 flex h-px items-center justify-between">
-      <span className="absolute inset-x-[6%] h-px bg-gradient-to-r from-copper/50 via-[var(--line)] to-copper/50" />
-      <span className="relative size-1.5 rounded-full bg-copper/80 shadow-[0_0_8px_rgb(233_162_95/0.8)]" />
-      <span className="relative size-1.5 rounded-full bg-copper/80 shadow-[0_0_8px_rgb(233_162_95/0.8)]" />
+      <span className="absolute inset-x-[6%] h-px bg-gradient-to-r from-brand/50 via-[var(--line)] to-brand/50" />
+      <span className="relative size-1.5 rounded-full bg-brand/80 shadow-[0_0_8px_rgb(55_47_99/0.8)]" />
+      <span className="relative size-1.5 rounded-full bg-brand/80 shadow-[0_0_8px_rgb(55_47_99/0.8)]" />
     </motion.div>
   );
 }

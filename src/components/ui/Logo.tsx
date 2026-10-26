@@ -2,14 +2,14 @@ import Link from "next/link";
 
 /**
  * Jerry Computers "JR" badge, vectorised from the supplied logo
- * (docs/reference/brand/jr-logo-original.webp) and recoloured to the copper
- * palette. It carries its own colours, so it reads the same on dark and light.
+ * (docs/reference/brand/jr-logo-original.webp) in its original colours. The site
+ * palette in globals.css is derived from these.
  */
 export const brandColors = {
-  ring: "#8a4416",
-  band: "#e9b98a",
-  centre: "#fffaf4",
-  ink: "#241b14",
+  ring: "#143d0c",
+  band: "#b8dcb5",
+  centre: "#fdfdfd",
+  ink: "#372f63",
 };
 
 /** Letterform outlines on a 1000×1000 canvas: J, then R. */

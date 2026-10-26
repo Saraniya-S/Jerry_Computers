@@ -72,7 +72,6 @@ export function WhyChooseUsSection() {
 function StackCard({ reason, index, total, progress, rich }: { reason: Reason; index: number; total: number; progress: MotionValue<number>; rich: boolean }) {
   const target = 1 - (total - 1 - index) * 0.045;
   const scale = useTransform(progress, [index / total, 1], [1, target]);
-  const dim = useTransform(progress, [index / total, (index + 1) / total], [0, index === total - 1 ? 0 : 0.45]);
 
   return (
     <li className={rich ? `sticky ${index === total - 1 ? "" : "h-[78vh] min-h-[520px]"}` : ""} style={rich ? { top: `calc(var(--nav-h) + 24px + ${index * 18}px)` } : undefined}>
@@ -81,7 +80,7 @@ function StackCard({ reason, index, total, progress, rich }: { reason: Reason; i
         className="relative grid overflow-hidden rounded-[28px] border border-[var(--card-edge)] bg-[linear-gradient(135deg,var(--stack-a)_0%,var(--stack-b)_45%,var(--stack-c)_100%)] p-3 shadow-[0_-20px_60px_-20px_var(--shadow),inset_0_1px_0_var(--highlight)] md:h-[460px] md:grid-cols-[0.95fr_1.05fr]"
       >
         <div className="flex flex-col p-5 sm:p-8">
-          <p className="font-mono text-[0.7rem] uppercase tracking-[0.18em] text-copper">
+          <p className="font-mono text-[0.7rem] uppercase tracking-[0.18em] text-brand">
             0{index + 1} / {reason.tag}
           </p>
           <h3 className="mt-5 max-w-sm text-balance text-3xl font-medium leading-[1.08] tracking-[-0.03em] text-fg sm:text-[2.4rem]">{reason.title}</h3>
@@ -94,8 +93,7 @@ function StackCard({ reason, index, total, progress, rich }: { reason: Reason; i
             ))}
           </ul>
         </div>
-        <div data-theme="dark" className="relative min-h-[260px] overflow-hidden rounded-[20px] border border-white/[0.08] bg-[#0e0b09]">{reason.visual}</div>
-        {rich && <motion.div aria-hidden style={{ opacity: dim }} className="stack-veil pointer-events-none absolute inset-0 rounded-[28px] bg-black" />}
+        <div data-surface="dark" className="relative min-h-[260px] overflow-hidden rounded-[20px] border border-white/[0.08] bg-ink-950">{reason.visual}</div>
       </motion.article>
     </li>
   );

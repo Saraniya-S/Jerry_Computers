@@ -20,7 +20,7 @@ export function ProductCategoryNavigation({ active, onSelect, className = "" }: 
             aria-pressed={isActive}
             onClick={() => onSelect(c.id)}
             className={`h-9 shrink-0 rounded-full border px-3.5 text-[0.8rem] transition-colors ${
-              isActive ? "border-copper/60 bg-copper/10 text-fg" : "border-line text-fg-muted hover:border-line-strong hover:text-fg"
+              isActive ? "border-brand/60 bg-brand/10 text-fg" : "border-line text-fg-muted hover:border-line-strong hover:text-fg"
             }`}
           >
             {c.label}

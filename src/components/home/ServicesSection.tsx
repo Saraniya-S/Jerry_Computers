@@ -105,7 +105,7 @@ export function ServicesSection() {
                 style={{ scale: markScale, opacity: markOpacity }}
                 className="pointer-events-none absolute left-1/2 top-1/2 z-[5] -translate-1/2 [perspective:600px]"
               >
-                <div className="absolute inset-[-130%] rounded-full bg-[radial-gradient(closest-side,var(--mark-glow),rgb(233_162_95/0.14)_45%,transparent)]" />
+                <div className="absolute inset-[-130%] rounded-full bg-[radial-gradient(closest-side,var(--mark-glow),rgb(184_220_181/0.35)_45%,transparent)]" />
                 <motion.div style={{ rotateY: markSpin }}>
                   <LogoMark className="relative size-40 drop-shadow-[0_0_44px_var(--mark-glow)]" />
                 </motion.div>

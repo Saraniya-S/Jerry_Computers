@@ -28,7 +28,7 @@ export function PlaceholderPage({ eyebrow, title, intro, notice, children }: Pro
           <h1 className="mt-5 max-w-3xl text-balance text-4xl font-medium tracking-[-0.035em] text-fg sm:text-6xl">{title}</h1>
           {intro && <div className="mt-5 max-w-2xl text-lg leading-relaxed text-fg-muted">{intro}</div>}
           {notice && (
-            <div role="note" className="mt-8 max-w-2xl rounded-2xl border border-copper/30 bg-copper/[0.06] p-5 text-sm leading-relaxed text-fg-muted">
+            <div role="note" className="mt-8 max-w-2xl rounded-2xl border border-brand/30 bg-brand/[0.06] p-5 text-sm leading-relaxed text-fg-muted">
               {notice}
             </div>
           )}

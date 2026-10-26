@@ -56,7 +56,7 @@ export function HelixMobile({ products }: { products: Product[] }) {
                     const y = 80 + Math.sin((x / 392) * Math.PI * 2 + s * Math.PI) * 56;
                     return `${k === 0 ? "M" : "L"}${x} ${y.toFixed(1)}`;
                   }).join(" ")}
-                  stroke={s ? "var(--line-strong)" : "var(--copper)"}
+                  stroke={s ? "var(--line-strong)" : "var(--brand)"}
                   strokeWidth="1.5"
                 />
               ))}

@@ -13,7 +13,6 @@ import { ButtonLink } from "@/components/ui/Button";
 import { Logo } from "@/components/ui/Logo";
 import { MegaMenu, type MegaItem } from "./MegaMenu";
 import { MobileNavigation } from "./MobileNavigation";
-import { ThemeToggle } from "./ThemeToggle";
 import { useActiveSection } from "./useActiveSection";
 
 type MenuKey = "services" | "products";
@@ -130,7 +129,7 @@ export function Navbar() {
                     {isActive && (
                       <motion.span
                         layoutId={reduce ? undefined : "nav-active"}
-                        className="absolute inset-x-2.5 -bottom-0.5 h-px bg-copper"
+                        className="absolute inset-x-2.5 -bottom-0.5 h-px bg-brand"
                         transition={{ type: "spring", stiffness: 400, damping: 34 }}
                       />
                     )}
@@ -164,7 +163,6 @@ export function Navbar() {
 
           {/* Right: account + CTA */}
           <div className="flex items-center justify-end gap-1.5 sm:gap-3">
-            <ThemeToggle className="size-10" />
             <Link
               href="/account"
               className="hidden items-center gap-1.5 rounded-lg px-2.5 py-2 text-sm text-fg-muted transition-colors hover:text-fg sm:inline-flex"
@@ -173,7 +171,7 @@ export function Navbar() {
               Login
             </Link>
             <span className="hidden sm:contents">
-              <ButtonLink href="/services/request" variant="copper" size="sm">
+              <ButtonLink href="/services/request" variant="brand" size="sm">
                 Book a Service
               </ButtonLink>
             </span>

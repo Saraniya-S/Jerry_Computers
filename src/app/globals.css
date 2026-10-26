@@ -1,84 +1,69 @@
 @import "tailwindcss";
 
-:root,
-[data-theme="dark"] {
-  color-scheme: dark;
-  --ink-950: #0b0908;
-  --ink-900: #110e0c;
-  --ink-850: #161210;
-  --ink-800: #1d1814;
-  --ink-700: #28211b;
-  --line: rgb(255 255 255 / 0.08);
-  --line-strong: rgb(255 255 255 / 0.14);
-  --fg: #f4efe8;
-  --fg-muted: #a89f94;
-  --fg-dim: #70675e;
-  --copper: #e9a25f;
-  --copper-deep: #c06a2b;
-  --copper-hover: #f3bb84;
-  --copper-glow: rgb(233 162 95 / 0.35);
+/*
+ * Light-only palette taken from the JR logo:
+ * indigo letters (#372f63), forest ring (#143d0c), mint band (#b8dcb5), white centre.
+ */
+:root {
+  color-scheme: light;
+  --ink-950: #f7f9f5;
+  --ink-900: #eef4ec;
+  --ink-850: #ffffff;
+  --ink-800: #e2ebe0;
+  --ink-700: #cfdccc;
+  --line: rgb(20 40 20 / 0.1);
+  --line-strong: rgb(20 40 20 / 0.18);
+  --fg: #1c1938;
+  --fg-muted: #555170;
+  --fg-dim: #8b88a0;
+  --brand: #372f63;
+  --brand-deep: #241e47;
+  --brand-hover: #2b2450;
+  --brand-glow: rgb(55 47 99 / 0.22);
+  --leaf: #143d0c;
+  --leaf-mid: #2f6b22;
+  --mint: #b8dcb5;
+  --mint-soft: #e4f2e2;
   /* Semantic surfaces */
-  --card-top: #201b17;
-  --card-bottom: #161210;
-  --card-edge: rgb(255 255 255 / 0.12);
-  --stack-a: #2e2620;
-  --stack-b: #1f1a16;
-  --stack-c: #151210;
-  --art-a: #2a2019;
-  --art-b: #0e0b09;
-  --inset: rgb(0 0 0 / 0.25);
-  --track: rgb(255 255 255 / 0.1);
-  --shadow: rgb(0 0 0 / 0.85);
-  --highlight: rgb(255 255 255 / 0.06);
-  --spot: rgb(255 255 255 / 0.08);
-  --mark: #ffffff;
-  --mark-glow: rgb(255 255 255 / 0.5);
-  --why-a: #0d0b0a;
-  --why-b: #0f0c0a;
-  --why-c: #090706;
-  --helix-glow: #22160d;
-  --helix-base: #080605;
-  --wordmark: rgb(255 255 255 / 0.09);
+  --card-top: #ffffff;
+  --card-bottom: #f6faf5;
+  --card-edge: rgb(20 40 20 / 0.1);
+  --stack-a: #ffffff;
+  --stack-b: #f3f8f1;
+  --stack-c: #e9f2e7;
+  --art-a: #f1f6ef;
+  --art-b: #dde8da;
+  --inset: rgb(20 40 20 / 0.04);
+  --track: rgb(20 40 20 / 0.1);
+  --shadow: rgb(30 40 60 / 0.16);
+  --highlight: rgb(255 255 255 / 0.9);
+  --spot: rgb(255 255 255 / 0.95);
+  --mark-glow: rgb(184 220 181 / 0.85);
+  --why-a: #eef4ec;
+  --why-b: #f3f7f1;
+  --why-c: #f7f9f5;
+  --helix-glow: #ffffff;
+  --helix-base: #e9f1e7;
+  --wordmark: rgb(55 47 99 / 0.07);
   --nav-h: 72px;
 }
 
-[data-theme="light"] {
-  color-scheme: light;
-  --ink-950: #f6f2ec;
-  --ink-900: #efe9e1;
-  --ink-850: #fffdf9;
-  --ink-800: #e7dfd4;
-  --ink-700: #d9cfc2;
-  --line: rgb(45 28 12 / 0.1);
-  --line-strong: rgb(45 28 12 / 0.18);
-  --fg: #1c1712;
-  --fg-muted: #5f564c;
-  --fg-dim: #8b8177;
-  --copper: #a95a22;
-  --copper-deep: #8a4416;
-  --copper-hover: #8f4a1a;
-  --copper-glow: rgb(169 90 34 / 0.25);
-  --card-top: #ffffff;
-  --card-bottom: #f8f3ec;
-  --card-edge: rgb(45 28 12 / 0.12);
-  --stack-a: #fffaf4;
-  --stack-b: #f5ede3;
-  --stack-c: #ede3d6;
-  --art-a: #f4ede4;
-  --art-b: #e2d7c9;
-  --inset: rgb(60 40 20 / 0.05);
-  --track: rgb(60 40 20 / 0.12);
-  --shadow: rgb(90 60 30 / 0.22);
-  --highlight: rgb(255 255 255 / 0.8);
-  --spot: rgb(255 255 255 / 0.9);
-  --mark: #1c1712;
-  --mark-glow: rgb(233 162 95 / 0.55);
-  --why-a: #efe9e1;
-  --why-b: #f3ede5;
-  --why-c: #f6f2ec;
-  --helix-glow: #fbf3e8;
-  --helix-base: #efe7dc;
-  --wordmark: rgb(45 28 12 / 0.08);
+/* Deep indigo "screen" panels (e.g. Why Choose Us visuals) inside the light page. */
+[data-surface="dark"] {
+  color-scheme: dark;
+  --ink-950: #15122b;
+  --ink-900: #1c1838;
+  --ink-850: #221d42;
+  --ink-800: #2a2550;
+  --ink-700: #352f5e;
+  --line: rgb(255 255 255 / 0.08);
+  --line-strong: rgb(255 255 255 / 0.14);
+  --fg: #f3f2fa;
+  --fg-muted: #a9a6c4;
+  --fg-dim: #6f6b8f;
+  --brand: #b8dcb5;
+  --track: rgb(255 255 255 / 0.12);
+  --inset: rgb(0 0 0 / 0.25);
 }
 
 @theme inline {
@@ -92,8 +77,12 @@
   --color-fg: var(--fg);
   --color-fg-muted: var(--fg-muted);
   --color-fg-dim: var(--fg-dim);
-  --color-copper: var(--copper);
-  --color-copper-deep: var(--copper-deep);
+  --color-brand: var(--brand);
+  --color-brand-deep: var(--brand-deep);
+  --color-leaf: var(--leaf);
+  --color-leaf-mid: var(--leaf-mid);
+  --color-mint: var(--mint);
+  --color-mint-soft: var(--mint-soft);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
   --font-serif: var(--font-instrument-serif);
@@ -110,16 +99,15 @@ body {
   color: var(--fg);
   font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
   overflow-x: clip;
-  transition: background-color 0.3s ease, color 0.3s ease;
 }
 
 ::selection {
-  background: var(--copper);
-  color: var(--ink-950);
+  background: var(--mint);
+  color: var(--brand-deep);
 }
 
 :focus-visible {
-  outline: 2px solid var(--copper);
+  outline: 2px solid var(--brand);
   outline-offset: 3px;
   border-radius: 6px;
 }
@@ -143,22 +131,8 @@ body {
   position: absolute;
   inset: 0;
   pointer-events: none;
-  opacity: 0.05;
+  opacity: 0.035;
   background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
-}
-
-/* Theme-specific media (e.g. hero videos). data-theme is set before first paint. */
-.theme-light-only,
-[data-theme="light"] .theme-dark-only {
-  display: none;
-}
-[data-theme="light"] .theme-light-only {
-  display: block;
-}
-
-/* Why Choose Us: darken stacked cards in dark mode only; a light veil reads as frosted glass. */
-[data-theme="light"] .stack-veil {
-  display: none;
 }
 
 .text-balance {
@@ -222,7 +196,7 @@ body {
     background: var(--track);
   }
   50% {
-    background: var(--copper);
+    background: var(--brand);
   }
 }
 

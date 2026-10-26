@@ -23,7 +23,7 @@ export function HeroSection() {
         <HeroIntro className="max-w-xl lg:max-w-[min(45vw,600px)]">
           <HeroIntroItem>
             <p className="inline-flex items-center gap-2 rounded-full border border-line bg-ink-900/60 py-1 pl-1.5 pr-3 font-mono text-[0.7rem] uppercase tracking-[0.14em] text-fg-muted backdrop-blur">
-              <span className="rounded-full bg-copper/15 px-2 py-0.5 text-copper">New</span>
+              <span className="rounded-full bg-brand/15 px-2 py-0.5 text-brand">New</span>
               Hardware &amp; service, one counter
             </p>
           </HeroIntroItem>
@@ -52,7 +52,7 @@ export function HeroSection() {
             <ul className="flex flex-wrap gap-x-6 gap-y-2 font-mono text-[0.7rem] uppercase tracking-[0.16em]" aria-label="What we do">
               {pillars.map((p, i) => (
                 <li key={p} className="flex items-center gap-2">
-                  <span className="text-copper/80">0{i + 1}</span>
+                  <span className="text-brand/80">0{i + 1}</span>
                   <span className="text-fg-muted">{p}</span>
                 </li>
               ))}

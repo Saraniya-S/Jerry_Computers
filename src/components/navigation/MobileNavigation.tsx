@@ -8,7 +8,6 @@ import { createPortal } from "react-dom";
 import { navLinks } from "@/config/site";
 import { ButtonLink } from "@/components/ui/Button";
 import { Logo } from "@/components/ui/Logo";
-import { ThemeToggle } from "./ThemeToggle";
 
 type Props = { open: boolean; onOpenChange: (open: boolean) => void; active: string | null };
 
@@ -103,15 +102,14 @@ export function MobileNavigation({ open, onOpenChange, active }: Props) {
                         className="flex items-baseline gap-4 border-b border-line py-4 text-3xl font-medium tracking-tight text-fg"
                       >
                         <span className="font-mono text-xs text-fg-dim">0{i + 1}</span>
-                        <span className={active === link.section ? "text-copper" : ""}>{link.label}</span>
+                        <span className={active === link.section ? "text-brand" : ""}>{link.label}</span>
                       </Link>
                     </motion.li>
                   ))}
                 </ul>
 
-                <ThemeToggle showLabel className="mb-4 h-11 self-start border border-line px-4 text-sm" />
                 <div className="grid gap-3">
-                  <ButtonLink href="/services/request" variant="copper" size="lg" onClick={close}>
+                  <ButtonLink href="/services/request" variant="brand" size="lg" onClick={close}>
                     Book a Service <ArrowUpRight className="size-4" aria-hidden />
                   </ButtonLink>
                   <ButtonLink href="/account" variant="outline" size="lg" onClick={close}>

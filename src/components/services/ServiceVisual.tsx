@@ -26,7 +26,7 @@ export function ServiceVisual({ id }: { id: ServiceId }) {
           ].map(({ icon: Icon, label, on }) => (
             <li key={label} className="flex items-center gap-2.5 text-[0.78rem] text-fg-muted">
               <span
-                className={`relative h-4 w-7 rounded-full ${on ? "bg-copper/90" : "bg-[var(--track)] [animation:toggle-track_4s_steps(1,end)_infinite]"}`}
+                className={`relative h-4 w-7 rounded-full ${on ? "bg-brand/90" : "bg-[var(--track)] [animation:toggle-track_4s_steps(1,end)_infinite]"}`}
               >
                 <span
                   className={`absolute top-0.5 size-3 rounded-full ${on ? "left-3.5 bg-ink-950" : "left-0.5 bg-fg-muted [animation:toggle-knob_4s_ease-in-out_infinite]"}`}
@@ -58,7 +58,7 @@ export function ServiceVisual({ id }: { id: ServiceId }) {
             <span className="ml-auto font-mono text-[0.7rem] text-fg">Printing</span>
           </div>
           <div className="relative h-1.5 overflow-hidden rounded-full bg-[var(--track)]">
-            <span className="absolute inset-y-0 left-0 w-1/3 rounded-full bg-copper [animation:lane-sweep_2.8s_ease-in-out_infinite]" />
+            <span className="absolute inset-y-0 left-0 w-1/3 rounded-full bg-brand [animation:lane-sweep_2.8s_ease-in-out_infinite]" />
           </div>
           <div className="flex gap-1.5">
             {["Cyan", "Magenta", "Yellow", "Black"].map((c, i) => (
@@ -72,11 +72,11 @@ export function ServiceVisual({ id }: { id: ServiceId }) {
         <div className="flex items-center gap-4" aria-hidden>
           <svg viewBox="0 0 60 60" className="size-16 -rotate-90">
             <circle cx="30" cy="30" r="24" fill="none" stroke="var(--track)" strokeWidth="5" />
-            <circle cx="30" cy="30" r="24" fill="none" stroke="var(--copper)" strokeWidth="5" strokeLinecap="round" strokeDasharray="150.8" strokeDashoffset="45" className="[animation:ring-charge_6s_ease-in-out_infinite]" />
+            <circle cx="30" cy="30" r="24" fill="none" stroke="var(--brand)" strokeWidth="5" strokeLinecap="round" strokeDasharray="150.8" strokeDashoffset="45" className="[animation:ring-charge_6s_ease-in-out_infinite]" />
           </svg>
           <div>
             <p className="flex items-center gap-1 text-[0.78rem] text-fg-muted">
-              <Zap className="size-3.5 text-copper" /> Battery test
+              <Zap className="size-3.5 text-brand" /> Battery test
             </p>
             <p className="mt-1 font-mono text-xl tracking-tight text-fg">Online</p>
           </div>
@@ -87,8 +87,8 @@ export function ServiceVisual({ id }: { id: ServiceId }) {
         <ul className="space-y-1.5" aria-hidden>
           {["Power supply", "Storage SMART", "Memory test", "Network"].map((t, i) => (
             <li key={t} className="flex items-center gap-2 text-[0.78rem] text-fg-muted">
-              <span className={`grid size-4 place-items-center rounded-[4px] border ${i < 3 ? "border-copper/60 bg-copper/15" : "border-line-strong"}`}>
-                {i < 3 && <Check className="size-3 text-copper" />}
+              <span className={`grid size-4 place-items-center rounded-[4px] border ${i < 3 ? "border-brand/60 bg-brand/15" : "border-line-strong"}`}>
+                {i < 3 && <Check className="size-3 text-brand" />}
               </span>
               <span className={i < 3 ? "text-fg" : ""}>{t}</span>
             </li>
@@ -111,7 +111,7 @@ function Bar({ pct, live = false }: { pct: number; live?: boolean }) {
   return (
     <div className="h-1.5 rounded-full bg-[var(--track)]">
       <div
-        className={`h-full origin-left rounded-full bg-gradient-to-r from-copper-deep to-copper ${live ? "[animation:bar-fill_5s_ease-in-out_infinite]" : ""}`}
+        className={`h-full origin-left rounded-full bg-gradient-to-r from-brand-deep to-brand ${live ? "[animation:bar-fill_5s_ease-in-out_infinite]" : ""}`}
         style={{ width: `${pct}%` }}
       />
     </div>

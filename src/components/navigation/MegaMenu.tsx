@@ -33,7 +33,7 @@ export function MegaMenu({ id, heading, items, footer, onNavigate }: MegaMenuPro
               <div className="p-4">
                 <p className="flex items-center gap-1 text-sm font-medium text-fg">
                   {item.title}
-                  <ChevronRight className="size-3.5 text-fg-muted transition-transform group-hover:translate-x-0.5 group-hover:text-copper" aria-hidden />
+                  <ChevronRight className="size-3.5 text-fg-muted transition-transform group-hover:translate-x-0.5 group-hover:text-brand" aria-hidden />
                 </p>
                 <p className="mt-1.5 text-[0.8rem] leading-snug text-fg-muted">{item.description}</p>
               </div>
