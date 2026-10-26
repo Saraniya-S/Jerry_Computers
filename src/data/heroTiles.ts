@@ -1,0 +1,35 @@
+/**
+ * Product photos for the hero's tilted-tiles background (Unsplash License; sources in
+ * docs/reference/hero-tiles-credits.md). Interleaved so neighbouring tiles differ.
+ */
+export const heroTiles = [
+  "/hero/tiles/laptop-1.webp",
+  "/hero/tiles/gpu-1.webp",
+  "/hero/tiles/pc-1.webp",
+  "/hero/tiles/cctv-1.webp",
+  "/hero/tiles/printer-1.webp",
+  "/hero/tiles/keyboard-1.webp",
+  "/hero/tiles/board-1.webp",
+  "/hero/tiles/rack-1.webp",
+  "/hero/tiles/laptop-2.webp",
+  "/hero/tiles/gpu-2.webp",
+  "/hero/tiles/pc-2.webp",
+  "/hero/tiles/cctv-2.webp",
+  "/hero/tiles/printer-2.webp",
+  "/hero/tiles/keyboard-2.webp",
+  "/hero/tiles/board-2.webp",
+  "/hero/tiles/rack-2.webp",
+  "/hero/tiles/laptop-3.webp",
+  "/hero/tiles/gpu-3.webp",
+  "/hero/tiles/pc-3.webp",
+  "/hero/tiles/cctv-3.webp",
+  "/hero/tiles/printer-3.webp",
+  "/hero/tiles/keyboard-3.webp",
+  "/hero/tiles/board-3.webp",
+  "/hero/tiles/laptop-4.webp",
+  "/hero/tiles/gpu-4.webp",
+  "/hero/tiles/pc-4.webp",
+  "/hero/tiles/keyboard-4.webp",
+  "/hero/tiles/pc-5.webp",
+  "/hero/tiles/pc-6.webp",
+];

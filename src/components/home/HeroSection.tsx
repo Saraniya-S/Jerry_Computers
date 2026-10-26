@@ -2,15 +2,18 @@ import { ArrowRight, ArrowUpRight } from "lucide-react";
 import { ButtonLink } from "@/components/ui/Button";
 import { Accent } from "@/components/ui/SectionHeading";
 import { HeroIntro, HeroIntroItem } from "./hero/HeroIntro";
-import { HeroVideo } from "./hero/HeroVideo";
+import { heroTiles } from "@/data/heroTiles";
+import { TiltedTiles } from "./hero/TiltedTiles";
 
 const pillars = ["Sales", "Repairs", "Installation", "Support"];
 
 export function HeroSection() {
   return (
     <section id="home" aria-labelledby="hero-title" className="relative isolate flex min-h-[100svh] flex-col overflow-hidden bg-ink-950 lg:min-h-[max(92svh,680px)]">
-      {/* Looping background video + pause control */}
-      <HeroVideo />
+      {/* Tilted wall of product photos scrolling past */}
+      <div className="absolute inset-0 -z-20">
+        <TiltedTiles images={heroTiles} heroId="home" />
+      </div>
 
       {/* Contrast layers for the text column */}
       <div aria-hidden className="pointer-events-none absolute inset-0 -z-10">
