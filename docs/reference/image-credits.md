@@ -1,4 +1,6 @@
-# Hero tile photos
+# Image credits
+
+## Hero tiles
 
 Product photos used by the hero's tilted-tiles background (`public/hero/tiles/`). All are from [Unsplash](https://unsplash.com) under the [Unsplash License](https://unsplash.com/license) (free for commercial use, no attribution required; Unsplash+ images were excluded). Each was cropped to a 360×360 square and converted to WebP.
 
@@ -33,3 +35,18 @@ Product photos used by the hero's tilted-tiles background (`public/hero/tiles/`)
 | `board-3.webp` | https://images.unsplash.com/photo-1712701815718-29f5fe510c0e |
 | `rack-1.webp` | https://images.unsplash.com/photo-1762163516269-3c143e04175c |
 | `rack-2.webp` | https://images.unsplash.com/photo-1695668548342-c0c1ad479aee |
+
+## About section fan
+
+Product photos in `public/about/` (Unsplash License, 720×720 WebP crops).
+
+| File | Unsplash image |
+| --- | --- |
+| `laptops.webp` | https://images.unsplash.com/photo-1525547719571-a2d4ac8945e2 |
+| `custom-pcs.webp` | https://images.unsplash.com/photo-1597872200969-2b65d56bd16b |
+| `components.webp` | https://images.unsplash.com/photo-1762838362452-fea83ce9c34c |
+| `cctv.webp` | https://images.unsplash.com/photo-1528312635006-8ea0bc49ec63 |
+| `printers.webp` | https://images.unsplash.com/photo-1612815154858-60aa4c59eaa6 |
+| `power.webp` | https://images.unsplash.com/photo-1762163516269-3c143e04175c |
+| `accessories.webp` | https://images.unsplash.com/photo-1618384887929-16ec33fab9ef |
+| `repairs.webp` | https://images.unsplash.com/photo-1515630278258-407f66498911 |

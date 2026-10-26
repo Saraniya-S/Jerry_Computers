@@ -1,59 +1,60 @@
-import { ArrowRight } from "lucide-react";
 import { productCategories } from "@/data/products";
 import { services } from "@/data/services";
-import { ButtonLink } from "@/components/ui/Button";
 import { Accent, Eyebrow } from "@/components/ui/SectionHeading";
 import { Reveal } from "@/components/ui/Reveal";
-import { HubMap } from "./about/HubMap";
+import { SleeveFan, type Sleeve } from "./about/SleeveFan";
 
-const pillars = [
-  { k: "Buy", title: "Hardware that suits the job", body: "Laptops, desktops, custom builds, components, CCTV, printers, UPS and accessories." },
-  { k: "Fix", title: "Repairs and diagnostics", body: "Fault-finding and repair for laptops, desktops, printers, CCTV and UPS equipment." },
-  { k: "Maintain", title: "Support after the sale", body: "Installation, servicing and technical help for the equipment you rely on." },
+/** Photos: Unsplash License; sources in docs/reference/image-credits.md. */
+const sleeves: Sleeve[] = [
+  { image: "/about/laptops.webp", title: "Laptops", subtitle: "Sales · upgrades · repairs" },
+  { image: "/about/custom-pcs.webp", title: "Custom PCs", subtitle: "Built to your brief" },
+  { image: "/about/components.webp", title: "Components", subtitle: "Graphics, memory, storage" },
+  { image: "/about/cctv.webp", title: "CCTV", subtitle: "Supply · install · maintain" },
+  { image: "/about/printers.webp", title: "Printers", subtitle: "Sales · servicing · repairs" },
+  { image: "/about/power.webp", title: "UPS & power", subtitle: "Backup power, installed and tested" },
+  { image: "/about/accessories.webp", title: "Accessories", subtitle: "Keyboards, mice and more" },
+  { image: "/about/repairs.webp", title: "Repairs", subtitle: "Diagnostics first, then the fix" },
+];
+
+const stats = [
+  { value: String(productCategories.length), label: "Product categories" },
+  { value: String(services.length), label: "Service lines" },
+  { value: "1", label: "Counter for it all" },
 ];
 
 export function AboutSection() {
   return (
     <section id="about" aria-labelledby="about-title" className="relative overflow-hidden border-t border-line bg-ink-950 py-24 sm:py-32">
-      <div className="mx-auto grid max-w-[1320px] items-center gap-16 px-5 sm:px-8 lg:grid-cols-[1fr_1.05fr] lg:gap-10">
+      <div className="mx-auto grid max-w-[1320px] gap-10 px-5 sm:px-8 lg:grid-cols-[1.2fr_1fr] lg:items-end lg:gap-16">
         <Reveal>
           <Eyebrow>About Jerry Computers</Eyebrow>
-          <h2 id="about-title" className="mt-6 max-w-xl text-balance text-4xl font-medium leading-[1.04] tracking-[-0.035em] text-fg sm:text-5xl lg:text-[3.6rem]">
-            Every device you run, looked after in <Accent>one</Accent> place.
+          <h2 id="about-title" className="mt-6 max-w-2xl text-balance text-4xl font-medium leading-[1.02] tracking-[-0.035em] text-fg sm:text-5xl lg:text-[4rem]">
+            Hardware and help, in <Accent>one</Accent> place.
           </h2>
-          <p className="mt-6 max-w-lg text-pretty text-base leading-relaxed text-fg-muted sm:text-lg">
-            Jerry Computers brings computer hardware and technical services together. Buy the right equipment, then come back to the same team for
-            installation, repairs and maintenance — whether it&apos;s a laptop, a custom PC, a CCTV system, a printer or a UPS.
+        </Reveal>
+
+        <Reveal delay={0.1}>
+          <p className="max-w-md text-pretty text-base leading-relaxed text-fg-muted sm:text-lg">
+            We sell computer hardware and look after it — installation, repairs and maintenance from the same team, whether it&apos;s a laptop, a custom PC,
+            CCTV, a printer or a UPS.
           </p>
-          <div className="mt-9 flex flex-wrap items-center gap-4">
-            <ButtonLink href="#services">
-              See our services <ArrowRight className="size-4" aria-hidden />
-            </ButtonLink>
-            <p className="inline-flex h-11 items-center gap-2.5 rounded-full border border-line px-4 text-sm text-fg-muted">
-              <span className="size-1.5 rounded-full bg-emerald-400 shadow-[0_0_10px_rgb(52_211_153/0.8)]" />
-              {productCategories.length} product categories · {services.length} service lines
-            </p>
-          </div>
-        </Reveal>
-
-        <Reveal delay={0.15}>
-          <HubMap />
+          <dl className="mt-7 flex gap-10">
+            {stats.map((s) => (
+              <div key={s.label}>
+                <dt className="sr-only">{s.label}</dt>
+                <dd className="text-3xl font-medium tracking-tight text-fg">{s.value}</dd>
+                <dd aria-hidden className="mt-1 text-xs text-fg-muted">
+                  {s.label}
+                </dd>
+              </div>
+            ))}
+          </dl>
         </Reveal>
       </div>
 
-      <div className="mx-auto mt-24 max-w-[1320px] px-5 sm:px-8">
-        <ol className="grid border-t border-line md:grid-cols-3">
-          {pillars.map((p, i) => (
-            <Reveal as="li" key={p.k} delay={i * 0.08} className="border-b border-line py-8 md:border-b-0 md:border-l md:px-8 md:first:border-l-0 md:first:pl-0">
-              <p className="font-mono text-[0.7rem] uppercase tracking-[0.18em] text-brand">
-                0{i + 1} — {p.k}
-              </p>
-              <h3 className="mt-4 text-xl font-medium tracking-tight text-fg">{p.title}</h3>
-              <p className="mt-2 max-w-sm text-[0.95rem] leading-relaxed text-fg-muted">{p.body}</p>
-            </Reveal>
-          ))}
-        </ol>
-      </div>
+      <Reveal delay={0.15} className="mx-auto mt-16 max-w-[1320px] px-5 sm:mt-20 sm:px-8">
+        <SleeveFan sleeves={sleeves} />
+      </Reveal>
     </section>
   );
 }

@@ -1,6 +1,6 @@
 /**
  * Product photos for the hero's tilted-tiles background (Unsplash License; sources in
- * docs/reference/hero-tiles-credits.md). Interleaved so neighbouring tiles differ.
+ * docs/reference/image-credits.md). Interleaved so neighbouring tiles differ.
  */
 export const heroTiles = [
   "/hero/tiles/laptop-1.webp",
