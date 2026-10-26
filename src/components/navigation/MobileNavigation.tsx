@@ -112,7 +112,7 @@ export function MobileNavigation({ open, onOpenChange, active }: Props) {
                   <ButtonLink href="/services/request" variant="brand" size="lg" onClick={close}>
                     Book a Service <ArrowUpRight className="size-4" aria-hidden />
                   </ButtonLink>
-                  <ButtonLink href="/account" variant="outline" size="lg" onClick={close}>
+                  <ButtonLink href="/login" variant="outline" size="lg" onClick={close}>
                     <UserRound className="size-4" aria-hidden /> Login
                   </ButtonLink>
                 </div>

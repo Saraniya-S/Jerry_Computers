@@ -2,19 +2,8 @@ import { productCategories } from "@/data/products";
 import { services } from "@/data/services";
 import { Accent, Eyebrow } from "@/components/ui/SectionHeading";
 import { Reveal } from "@/components/ui/Reveal";
-import { SleeveFan, type Sleeve } from "./about/SleeveFan";
-
-/** Photos: Unsplash License; sources in docs/reference/image-credits.md. */
-const sleeves: Sleeve[] = [
-  { image: "/about/laptops.webp", title: "Laptops", subtitle: "Sales · upgrades · repairs" },
-  { image: "/about/custom-pcs.webp", title: "Custom PCs", subtitle: "Built to your brief" },
-  { image: "/about/components.webp", title: "Components", subtitle: "Graphics, memory, storage" },
-  { image: "/about/cctv.webp", title: "CCTV", subtitle: "Supply · install · maintain" },
-  { image: "/about/printers.webp", title: "Printers", subtitle: "Sales · servicing · repairs" },
-  { image: "/about/power.webp", title: "UPS & power", subtitle: "Backup power, installed and tested" },
-  { image: "/about/accessories.webp", title: "Accessories", subtitle: "Keyboards, mice and more" },
-  { image: "/about/repairs.webp", title: "Repairs", subtitle: "Diagnostics first, then the fix" },
-];
+import { showcase } from "@/data/showcase";
+import { SleeveFan } from "./about/SleeveFan";
 
 const stats = [
   { value: String(productCategories.length), label: "Product categories" },
@@ -53,7 +42,7 @@ export function AboutSection() {
       </div>
 
       <Reveal delay={0.15} className="mx-auto mt-16 max-w-[1320px] px-5 sm:mt-20 sm:px-8">
-        <SleeveFan sleeves={sleeves} />
+        <SleeveFan sleeves={showcase} />
       </Reveal>
     </section>
   );

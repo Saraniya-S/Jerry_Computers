@@ -164,7 +164,7 @@ export function Navbar() {
           {/* Right: account + CTA */}
           <div className="flex items-center justify-end gap-1.5 sm:gap-3">
             <Link
-              href="/account"
+              href="/login"
               className="hidden items-center gap-1.5 rounded-lg px-2.5 py-2 text-sm text-fg-muted transition-colors hover:text-fg sm:inline-flex"
             >
               <UserRound className="size-4" aria-hidden />
