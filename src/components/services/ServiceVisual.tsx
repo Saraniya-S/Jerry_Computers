@@ -84,7 +84,7 @@ export function ServiceVisual({ id }: { id: ServiceId }) {
       );
     case "diagnostics":
       return (
-        <ul className="space-y-1.5" aria-hidden>
+        <ul className="space-y-1 leading-4" aria-hidden>
           {["Power supply", "Storage SMART", "Memory test", "Network"].map((t, i) => (
             <li key={t} className="flex items-center gap-2 text-[0.78rem] text-fg-muted">
               <span className={`grid size-4 place-items-center rounded-[4px] border ${i < 3 ? "border-brand/60 bg-brand/15" : "border-line-strong"}`}>

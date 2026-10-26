@@ -82,13 +82,13 @@ export function ServicesSection() {
           {/* Soft studio light behind the mark, as in the reference */}
           <div aria-hidden className="pointer-events-none absolute inset-0 bg-[radial-gradient(55%_55%_at_50%_52%,var(--spot),transparent_72%)]" />
 
-          <div className={`relative z-20 mx-auto w-full max-w-[1320px] px-5 text-center sm:px-8 ${rich ? "pt-20 [@media(min-height:860px)]:pt-24" : ""}`}>
+          <div className={`relative z-20 mx-auto w-full max-w-[1320px] px-5 text-center sm:px-8 ${rich ? "pt-[4.75rem] [@media(min-height:860px)]:pt-24" : ""}`}>
             <Eyebrow className="justify-center">Services</Eyebrow>
-            <div className="relative mt-5">
+            <div className={`relative ${rich ? "mt-4" : "mt-5"}`}>
               <motion.h2
                 id="services-title"
                 style={rich ? { opacity: titleA } : undefined}
-                className="text-balance text-4xl font-medium tracking-[-0.035em] text-fg sm:text-5xl lg:text-6xl"
+                className="text-balance text-4xl font-medium tracking-[-0.035em] text-fg sm:text-5xl lg:text-6xl [@media(max-height:820px)]:lg:text-5xl"
               >
                 Every service, under <Accent>one</Accent> roof.
               </motion.h2>
@@ -96,7 +96,7 @@ export function ServicesSection() {
                 <motion.p
                   aria-hidden
                   style={{ opacity: titleB, y: titleBy }}
-                  className="absolute inset-x-0 top-0 text-balance text-4xl font-medium tracking-[-0.035em] text-fg sm:text-5xl lg:text-6xl"
+                  className="absolute inset-x-0 top-0 text-balance text-4xl font-medium tracking-[-0.035em] text-fg sm:text-5xl lg:text-6xl [@media(max-height:820px)]:lg:text-5xl"
                 >
                   Pick what you <Accent>need.</Accent>
                 </motion.p>
@@ -109,7 +109,7 @@ export function ServicesSection() {
             )}
           </div>
 
-          <div ref={fitRef} className={`relative mx-auto w-full max-w-[1080px] px-5 sm:px-8 ${rich ? "mt-4 flex min-h-0 flex-1 items-center pb-6" : "mt-14"}`}>
+          <div ref={fitRef} className={`relative mx-auto w-full max-w-[1180px] px-5 sm:px-8 ${rich ? "mt-2 flex min-h-0 flex-1 items-center pb-3" : "mt-14"}`}>
             <div ref={scalerRef} className="relative w-full origin-center">
               {rich && (
                 <motion.div
@@ -124,7 +124,7 @@ export function ServicesSection() {
                 </motion.div>
               )}
 
-              <ul ref={stageRef} className="relative grid w-full gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              <ul ref={stageRef} className={`relative grid w-full sm:grid-cols-2 lg:grid-cols-3 ${rich ? "gap-3" : "gap-4"}`}>
                 {services.map((service, i) => (
                   <OrbitItem key={service.id} service={service} index={i} count={services.length} progress={progress} stage={stage} enabled={rich} />
                 ))}
@@ -205,7 +205,7 @@ function OrbitItem({ service, index, count, progress, stage, enabled }: OrbitIte
       style={enabled ? { x, y, scale, opacity, zIndex } : undefined}
       className={enabled && !interactive ? "pointer-events-none" : undefined}
     >
-      <ServiceCard service={service} />
+      <ServiceCard service={service} compact={enabled} />
     </motion.li>
   );
 }
