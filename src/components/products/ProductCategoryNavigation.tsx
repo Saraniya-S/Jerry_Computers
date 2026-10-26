@@ -2,16 +2,20 @@
 
 import { productCategories, type ProductCategoryId } from "@/data/products";
 
+export type CategoryFilter = ProductCategoryId | "all";
+
 type Props = {
-  active: ProductCategoryId;
-  onSelect: (id: ProductCategoryId) => void;
+  active: CategoryFilter;
+  onSelect: (id: CategoryFilter) => void;
   className?: string;
 };
 
+const options: { id: CategoryFilter; label: string }[] = [{ id: "all", label: "All" }, ...productCategories];
+
 export function ProductCategoryNavigation({ active, onSelect, className = "" }: Props) {
   return (
-    <div role="group" aria-label="Jump to category" className={`flex gap-1.5 overflow-x-auto [scrollbar-width:none] ${className}`}>
-      {productCategories.map((c) => {
+    <div role="group" aria-label="Filter by category" className={`flex gap-1.5 overflow-x-auto [scrollbar-width:none] ${className}`}>
+      {options.map((c) => {
         const isActive = c.id === active;
         return (
           <button

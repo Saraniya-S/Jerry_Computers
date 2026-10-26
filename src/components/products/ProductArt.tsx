@@ -7,13 +7,20 @@ import type { ProductCategoryId } from "@/data/products";
 
 const accents = ["#5a4fa0", "#7cbf78", "#2f6b22"] as const;
 
-type ArtProps = { category: ProductCategoryId; variant?: 0 | 1 | 2; className?: string; title?: string };
+type ArtProps = {
+  category: ProductCategoryId;
+  variant?: 0 | 1 | 2;
+  className?: string;
+  title?: string;
+  /** "cover" crops the artwork to fill its box (used for narrow reel slices). */
+  fit?: "contain" | "cover";
+};
 
-export function ProductArt({ category, variant = 0, className = "", title }: ArtProps) {
+export function ProductArt({ category, variant = 0, className = "", title, fit = "contain" }: ArtProps) {
   const a = accents[variant];
   const id = `${category}-${variant}`;
   return (
-    <svg viewBox="0 0 240 180" className={className} role={title ? "img" : undefined} aria-hidden={title ? undefined : true} aria-label={title}>
+    <svg viewBox="0 0 240 180" preserveAspectRatio={fit === "cover" ? "xMidYMid slice" : undefined} className={className} role={title ? "img" : undefined} aria-hidden={title ? undefined : true} aria-label={title}>
       <defs>
         <linearGradient id={`body-${id}`} x1="0" y1="0" x2="0" y2="1">
           <stop offset="0" stopColor="#3a3d48" />
@@ -33,7 +40,7 @@ export function ProductArt({ category, variant = 0, className = "", title }: Art
           <stop offset="1" stopColor={a} stopOpacity="0" />
         </radialGradient>
       </defs>
-      <ellipse cx="120" cy="158" rx="86" ry="10" fill="#000" opacity="0.55" />
+      {fit === "contain" && <ellipse cx="120" cy="158" rx="86" ry="10" fill="#000" opacity="0.55" />}
       <ellipse cx="120" cy="96" rx="96" ry="70" fill={`url(#glow-${id})`} opacity="0.5" />
       {renderShape(category, id, a, variant)}
     </svg>

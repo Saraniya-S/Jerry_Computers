@@ -6,7 +6,7 @@ import { ProductArt } from "./ProductArt";
 
 type ProductCardProps = {
   product: Product;
-  /** When false the card is decorative (e.g. off-axis in the helix) and not focusable. */
+  /** When false the card is decorative (e.g. used as artwork) and not focusable. */
   interactive?: boolean;
   className?: string;
 };

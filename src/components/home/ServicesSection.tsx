@@ -29,9 +29,11 @@ const smooth = (t: number) => t * t * (3 - 2 * t);
 const clamp01 = (t: number) => Math.min(1, Math.max(0, t));
 
 export function ServicesSection() {
-  const rich = useRichMotion(1024, 820);
+  const rich = useRichMotion(1024, 600);
   const ref = useRef<HTMLDivElement>(null);
   const stageRef = useRef<HTMLUListElement>(null);
+  const fitRef = useRef<HTMLDivElement>(null);
+  const scalerRef = useRef<HTMLDivElement>(null);
   const stage = useRef<Stage>({ w: 0, h: 0, visible: false });
   const { scrollYProgress } = useScroll({ target: ref, offset: ["start start", "end end"] });
   const progress = useSpring(scrollYProgress, { stiffness: 120, damping: 28, mass: 0.4 });
@@ -47,11 +49,20 @@ export function ServicesSection() {
   useEffect(() => {
     const el = stageRef.current;
     if (!rich || !el) return;
+    const fit = fitRef.current;
+    const scaler = scalerRef.current;
     const ro = new ResizeObserver(() => {
       stage.current.w = el.offsetWidth;
       stage.current.h = el.offsetHeight;
+      // Shrink the whole stage on short windows so both grid rows fit (e.g. laptops at 125–200% zoom).
+      if (fit && scaler) {
+        const pad = parseFloat(getComputedStyle(fit).paddingBottom) || 0;
+        const scale = Math.min(1, (fit.clientHeight - pad) / el.offsetHeight);
+        scaler.style.transform = scale < 1 ? `scale(${scale.toFixed(3)})` : "";
+      }
     });
     ro.observe(el);
+    if (fit) ro.observe(fit);
     const io = new IntersectionObserver(([e]) => (stage.current.visible = e.isIntersecting));
     io.observe(el);
     return () => {
@@ -67,11 +78,11 @@ export function ServicesSection() {
   return (
     <section id="services" aria-labelledby="services-title" className="relative border-t border-line bg-ink-900">
       <div ref={ref} className={rich ? "h-[280vh]" : ""}>
-        <div className={`${rich ? "sticky top-0 flex h-[100svh] min-h-[720px] flex-col overflow-hidden" : "py-24"} grain`}>
+        <div className={`${rich ? "sticky top-0 flex h-[100svh] min-h-[600px] flex-col overflow-hidden" : "py-24"} grain`}>
           {/* Soft studio light behind the mark, as in the reference */}
           <div aria-hidden className="pointer-events-none absolute inset-0 bg-[radial-gradient(55%_55%_at_50%_52%,var(--spot),transparent_72%)]" />
 
-          <div className={`relative z-20 mx-auto w-full max-w-[1320px] px-5 text-center sm:px-8 ${rich ? "pt-24" : ""}`}>
+          <div className={`relative z-20 mx-auto w-full max-w-[1320px] px-5 text-center sm:px-8 ${rich ? "pt-20 [@media(min-height:860px)]:pt-24" : ""}`}>
             <Eyebrow className="justify-center">Services</Eyebrow>
             <div className="relative mt-5">
               <motion.h2
@@ -98,25 +109,27 @@ export function ServicesSection() {
             )}
           </div>
 
-          <div className={`relative mx-auto w-full max-w-[1080px] px-5 sm:px-8 ${rich ? "mt-6 flex flex-1 items-center pb-8" : "mt-14"}`}>
-            {rich && (
-              <motion.div
-                aria-hidden
-                style={{ scale: markScale, opacity: markOpacity }}
-                className="pointer-events-none absolute left-1/2 top-1/2 z-[5] -translate-1/2 [perspective:600px]"
-              >
-                <div className="absolute inset-[-130%] rounded-full bg-[radial-gradient(closest-side,var(--mark-glow),rgb(184_220_181/0.35)_45%,transparent)]" />
-                <motion.div style={{ rotateY: markSpin }}>
-                  <LogoMark className="relative size-40 drop-shadow-[0_0_44px_var(--mark-glow)]" />
+          <div ref={fitRef} className={`relative mx-auto w-full max-w-[1080px] px-5 sm:px-8 ${rich ? "mt-4 flex min-h-0 flex-1 items-center pb-6" : "mt-14"}`}>
+            <div ref={scalerRef} className="relative w-full origin-center">
+              {rich && (
+                <motion.div
+                  aria-hidden
+                  style={{ scale: markScale, opacity: markOpacity }}
+                  className="pointer-events-none absolute left-1/2 top-1/2 z-[5] -translate-1/2 [perspective:600px]"
+                >
+                  <div className="absolute inset-[-130%] rounded-full bg-[radial-gradient(closest-side,var(--mark-glow),rgb(184_220_181/0.35)_45%,transparent)]" />
+                  <motion.div style={{ rotateY: markSpin }}>
+                    <LogoMark className="relative size-40 drop-shadow-[0_0_44px_var(--mark-glow)]" />
+                  </motion.div>
                 </motion.div>
-              </motion.div>
-            )}
+              )}
 
-            <ul ref={stageRef} className="relative grid w-full gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {services.map((service, i) => (
-                <OrbitItem key={service.id} service={service} index={i} count={services.length} progress={progress} stage={stage} enabled={rich} />
-              ))}
-            </ul>
+              <ul ref={stageRef} className="relative grid w-full gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                {services.map((service, i) => (
+                  <OrbitItem key={service.id} service={service} index={i} count={services.length} progress={progress} stage={stage} enabled={rich} />
+                ))}
+              </ul>
+            </div>
           </div>
 
           {!rich && (

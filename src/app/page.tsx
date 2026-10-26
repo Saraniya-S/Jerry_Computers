@@ -3,7 +3,7 @@ import { HeroSection } from "@/components/home/HeroSection";
 import { AboutSection } from "@/components/home/AboutSection";
 import { ServicesSection } from "@/components/home/ServicesSection";
 import { WhyChooseUsSection } from "@/components/home/WhyChooseUsSection";
-import { HelixProductsSection } from "@/components/home/HelixProductsSection";
+import { ProductsSection } from "@/components/home/ProductsSection";
 import { ContactSection } from "@/components/home/ContactSection";
 import { HomeFooter } from "@/components/home/HomeFooter";
 
@@ -19,7 +19,7 @@ export default function Home() {
         <AboutSection />
         <ServicesSection />
         <WhyChooseUsSection />
-        <HelixProductsSection />
+        <ProductsSection />
         <ContactSection />
       </main>
       <HomeFooter />

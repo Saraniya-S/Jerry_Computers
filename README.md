@@ -29,7 +29,7 @@ The JR badge is a vector trace of the supplied logo (`docs/reference/brand/jr-lo
 
 - **Hero** — looping background video (`public/hero/hero-1080.mp4`, `hero-720.mp4` for small screens, `hero-poster.webp`), graded indigo from `docs/reference/hero-light-original.mp4` and crossfaded into a seamless loop. Pauses off-screen / in background tabs, stays on the poster under reduced motion, and has a pause button.
 - **About** — hub-and-orbit integration map.
-- **Services** — cards orbit the glowing Jerry mark on a tilted ring (upright, nearer cards larger and on top), then fold into the grid as you scroll; widgets animate with CSS. Only at ≥1024×820 with motion allowed; a static grid otherwise.
+- **Services** — cards orbit the glowing Jerry mark on a tilted ring (upright, nearer cards larger and on top), then fold into the grid as you scroll; widgets animate with CSS. Only at ≥1024×600 with motion allowed (the stage scales down to fit short windows); a static grid otherwise.
 - **Why choose us** — sticky stacking cards + scroll-lit word reveal.
-- **Products** — CSS-3D double helix (`src/components/products/helix`), simplified two-strand carousel on touch / small screens / reduced motion.
+- **Products** — elastic reel (`src/components/products/reel/ElasticReel.tsx`): a dock of product slices that magnify around the pointer or a dragged finger, open into a full product tile on click (arrows, swipe, Esc/arrow keys to move), sweep a focus across while idle, and filter by category. Never captures page scrolling; springs settle instantly under reduced motion.
 - **Contact** and **Footer** read everything from `site.ts`.
