@@ -27,7 +27,7 @@ The JR badge is a vector trace of the supplied logo (`docs/reference/brand/jr-lo
 
 `src/components/home/*` — one component per section:
 
-- **Hero** — tilted wall of real product photos scrolling past (`src/components/home/hero/TiltedTiles.tsx`, after ReactBits' Tilted Tiles): 16 columns on a plane tilted 40°/16°/−20°, alternate columns moving in opposite directions, top fade, gentle mouse parallax. Pure CSS transform loops; paused off-screen, still under reduced motion. Photos are 29 Unsplash-licensed images in `public/hero/tiles/` (list in `src/data/heroTiles.ts`, sources in `docs/reference/hero-tiles-credits.md`).
+- **Hero** — tilted wall of real product photos scrolling past (`src/components/home/hero/TiltedTiles.tsx`, after ReactBits' Tilted Tiles): 16 columns on a plane tilted 40°/16°/−20°, alternate columns moving in opposite directions, top fade, gentle mouse parallax. Web Animations transform loops (no global CSS); paused off-screen, still under reduced motion. Photos are 29 Unsplash-licensed images in `public/hero/tiles/` (list in `src/data/heroTiles.ts`, sources in `docs/reference/hero-tiles-credits.md`).
 - **About** — hub-and-orbit integration map.
 - **Services** — cards orbit the glowing Jerry mark on a tilted ring (upright, nearer cards larger and on top), then fold into the grid as you scroll; widgets animate with CSS. Only at ≥1024×600 with motion allowed (the stage scales down to fit short windows); a static grid otherwise.
 - **Why choose us** — sticky stacking cards + scroll-lit word reveal.

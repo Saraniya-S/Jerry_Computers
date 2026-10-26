@@ -26,14 +26,17 @@ const tiles = {
 
 /**
  * A tilted wall of product-photo columns scrolling past, used behind the hero.
- * Columns loop with CSS transforms (GPU-composited), alternate direction, pause
- * while off-screen, and stay still under prefers-reduced-motion. The pointer
+ * Columns loop with Web Animations transforms (GPU-composited, no global CSS
+ * needed), alternate direction, pause while off-screen, and stay still under
+ * prefers-reduced-motion. The pointer
  * steers the tilt a little on devices with a mouse.
  */
 export function TiltedTiles({ images, heroId }: { images: string[]; heroId: string }) {
   const reduce = useReducedMotion() ?? false;
   const wrapRef = useRef<HTMLDivElement>(null);
   const planeRef = useRef<HTMLDivElement>(null);
+  const trackRefs = useRef<(HTMLDivElement | null)[]>([]);
+  const animations = useRef<Animation[]>([]);
   const [running, setRunning] = useState(true);
   const [perColumn, setPerColumn] = useState(tiles.perColumn);
 
@@ -61,6 +64,31 @@ export function TiltedTiles({ images, heroId }: { images: string[]; heroId: stri
       ro.disconnect();
     };
   }, []);
+
+  // Endless vertical loops: each track holds two copies, so -50% is exactly one lap.
+  useEffect(() => {
+    if (reduce) return;
+    const anims = trackRefs.current.map((el, c) => {
+      if (!el) return null;
+      const reverse = c % 2 === 1;
+      const frames = reverse
+        ? [{ transform: "translateY(-50%)" }, { transform: "translateY(0)" }]
+        : [{ transform: "translateY(0)" }, { transform: "translateY(-50%)" }];
+      return el.animate(frames, {
+        duration: tiles.duration * 1000,
+        iterations: Infinity,
+        easing: "linear",
+        // Head start for alternating columns so the wall doesn't move in lockstep.
+        delay: -((c * tiles.stagger) % 1) * tiles.duration * 1000,
+      });
+    });
+    animations.current = anims.filter((a): a is Animation => a !== null);
+    return () => animations.current.forEach((a) => a.cancel());
+  }, [reduce, perColumn]);
+
+  useEffect(() => {
+    animations.current.forEach((a) => (running ? a.play() : a.pause()));
+  }, [running, perColumn]);
 
   useEffect(() => {
     const hero = document.getElementById(heroId);
@@ -109,31 +137,25 @@ export function TiltedTiles({ images, heroId }: { images: string[]; heroId: stri
         }}
       >
         <div className="flex h-full" style={{ gap: tiles.gap }}>
-          {columns.map((col, c) => {
-            const reverse = c % 2 === 1;
-            return (
-              <div key={c} className="relative h-full min-w-0 flex-1 overflow-hidden">
-                <div
-                  className="flex flex-col will-change-transform"
-                  style={{
-                    gap: tiles.gap,
-                    // One trailing gap so -50% is exactly one copy (tile + gap) × perColumn.
-                    paddingBottom: tiles.gap,
-                    animation: reduce ? undefined : `tiles-${reverse ? "down" : "up"} ${tiles.duration}s linear infinite`,
-                    animationDelay: `${-((c * tiles.stagger) % 1) * tiles.duration}s`,
-                    animationPlayState: running ? "running" : "paused",
-                  }}
-                >
-                  {/* Two copies of the column so the loop is seamless */}
-                  {[...col, ...col].map((src, k) => (
-                    <div key={k} className="relative aspect-square w-full shrink-0 overflow-hidden bg-ink-800">
-                      <Image src={src} alt="" fill sizes="(max-width: 768px) 120px, 220px" className="object-cover" />
-                    </div>
+          {columns.map((col, c) => (
+            <div key={c} className="relative h-full min-w-0 flex-1 overflow-hidden">
+              <div
+                ref={(el) => {
+                  trackRefs.current[c] = el;
+                }}
+                className="flex flex-col will-change-transform"
+                // One trailing gap so -50% is exactly one copy (tile + gap) × perColumn.
+                style={{ gap: tiles.gap, paddingBottom: tiles.gap }}
+              >
+                {/* Two copies of the column so the loop is seamless */}
+                {[...col, ...col].map((src, k) => (
+                  <div key={k} className="relative aspect-square w-full shrink-0 overflow-hidden bg-ink-800">
+                    <Image src={src} alt="" fill sizes="(max-width: 768px) 120px, 220px" className="object-cover" />
+                  </div>
                   ))}
                 </div>
               </div>
-            );
-          })}
+          ))}
         </div>
       </motion.div>
     </div>
