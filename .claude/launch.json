@@ -33,6 +33,19 @@
         "3100"
       ],
       "port": 3100
+    },
+    {
+      "name": "prod-testdb",
+      "runtimeExecutable": "env",
+      "runtimeArgs": [
+        "DATABASE_URL=postgres://jerry:jerry@localhost:5433/jerry_computers_test",
+        "npx",
+        "next",
+        "start",
+        "-p",
+        "3101"
+      ],
+      "port": 3101
     }
   ]
 }

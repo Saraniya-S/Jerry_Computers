@@ -18,9 +18,11 @@ export const invoiceNumber = (seq: number) => `INV-${String(seq).padStart(6, "0"
 
 export const orderStatusLabel: Record<string, string> = {
   placed: "Placed",
+  confirmed: "Confirmed",
   packed: "Packed",
   shipped: "Shipped",
   delivered: "Delivered",
+  returned: "Returned",
   cancelled: "Cancelled",
 };
 

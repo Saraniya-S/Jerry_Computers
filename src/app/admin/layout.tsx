@@ -22,7 +22,8 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
 }
 
 async function StaffMenu() {
-  const staff = await requireStaff();
-  const badge = staff.isSuperAdmin ? "Super admin" : staff.role === "admin" ? "Admin" : "E-commerce";
+  // The admin area is admins only; e-commerce staff are sent to /staff.
+  const staff = await requireStaff(["admin"]);
+  const badge = staff.isSuperAdmin ? "Super admin" : "Admin";
   return <UserMenu name={`${staff.firstName} ${staff.lastName}`.trim()} email={staff.email} profileHref={null} badge={badge} />;
 }

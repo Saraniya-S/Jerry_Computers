@@ -141,9 +141,12 @@ async function Overview() {
               {(
                 [
                   ["Unassigned", m.services.open],
-                  ["Assigned", m.services.assigned],
+                  ["Assigned, not accepted", m.services.assigned],
+                  ["Accepted", m.services.accepted],
                   ["In progress", m.services.in_progress],
                   ["Awaiting parts", m.services.awaiting_parts],
+                  ["Awaiting customer", m.services.awaiting_customer],
+                  ["Handed back", m.services.unable_to_complete],
                   ["Completed", m.services.completed],
                   ["Cancelled", m.services.cancelled],
                 ] as const

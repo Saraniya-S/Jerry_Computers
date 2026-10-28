@@ -23,6 +23,7 @@ export function ServiceRequestForm() {
   const [location, setLocation] = useState<"in_shop" | "on_site">("in_shop");
   const [address, setAddress] = useState<AddressDraft>(emptyAddress());
   const [mapsUrl, setMapsUrl] = useState("");
+  const [pin, setPin] = useState("");
   const [device, setDevice] = useState({ deviceType: "" as DeviceType | "", deviceBrand: "", deviceModel: "", serialNumber: "", accessories: "" });
   const [issue, setIssue] = useState("");
   const [priority, setPriority] = useState<ServicePriority>("normal");
@@ -35,7 +36,7 @@ export function ServiceRequestForm() {
       contact: who === "walk_in" ? contact : customer && !customer.phone ? { firstName: customer.firstName, lastName: customer.lastName, phone: contact.phone, email: "" } : undefined,
       source,
       location,
-      address: location === "on_site" ? { ...address, label: address.label as "Home", state: address.state as "Tamil Nadu", mapsUrl } : undefined,
+      address: location === "on_site" ? { ...address, label: address.label as "Home", state: address.state as "Tamil Nadu", mapsUrl, pin } : undefined,
       deviceType: device.deviceType as DeviceType,
       deviceBrand: device.deviceBrand,
       deviceModel: device.deviceModel,
@@ -132,6 +133,15 @@ export function ServiceRequestForm() {
             <>
               {errors.address && <p className="text-[0.8rem] text-red-600">{errors.address}</p>}
               <AddressFields value={address} onChange={setAddress} errors={addrErrors} />
+              <TextField
+                label="Map pin"
+                optional
+                value={pin}
+                error={errors["address.pin"]}
+                onChange={(e) => setPin(e.target.value)}
+                placeholder="12.9716, 80.2209"
+                hint="Latitude, longitude from a dropped pin. Gives the engineer exact directions."
+              />
               <TextField label="Map link" optional type="url" value={mapsUrl} error={errors["address.mapsUrl"]} onChange={(e) => setMapsUrl(e.target.value)} placeholder="https://maps.google.com/…" hint="A pin the customer shared, so the engineer can get directions." />
             </>
           )}

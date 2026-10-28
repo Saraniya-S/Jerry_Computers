@@ -6,9 +6,9 @@ import { can, permissions } from "@/lib/server/permissions";
 import { actorOf, makeUser, reset } from "./helpers";
 
 describe("permission matrix", () => {
-  it("keeps e-commerce staff to orders and payments", () => {
+  it("keeps e-commerce staff to orders, payments and read-only lookups", () => {
     const staffCan = (Object.keys(permissions) as (keyof typeof permissions)[]).filter((p) => can("ecommerce_staff", p));
-    expect(staffCan.sort()).toEqual(["orders.fulfil", "orders.view", "payments.record"]);
+    expect(staffCan.sort()).toEqual(["catalogue.view", "customers.view", "orders.fulfil", "orders.view", "payments.record", "staffPortal.view"]);
   });
 
   it("gives customers and engineers no admin permissions", () => {
@@ -18,7 +18,7 @@ describe("permission matrix", () => {
   });
 
   it("reserves refunds, staff management and catalogue changes for admins", () => {
-    for (const p of ["payments.refund", "staff.manage", "catalogue.manage", "inventory.adjust", "service.manage", "engineers.manage"] as const) {
+    for (const p of ["payments.refund", "staff.manage", "catalogue.manage", "inventory.adjust", "customers.manage", "service.manage", "engineers.manage", "reports.view", "dashboard.view"] as const) {
       expect(can("admin", p)).toBe(true);
       expect(can("ecommerce_staff", p)).toBe(false);
     }

@@ -2,10 +2,25 @@ import "server-only";
 import { alias } from "drizzle-orm/pg-core";
 import { and, asc, count, desc, eq, gte, ilike, inArray, lt, or, sql, type SQL } from "drizzle-orm";
 import { z } from "zod";
-import { ACTIVE_SERVICE_STATUSES, engineerFlow, isActiveStatus, serviceFlow, serviceNumber, serviceRequestInput, serviceStatusLabel, type ServiceRequestInput } from "@/lib/service-desk";
+import {
+  ACTIVE_SERVICE_STATUSES,
+  engineerFlow,
+  isActiveStatus,
+  isClosedStatus,
+  noteKindLabel,
+  notePrompt,
+  noteRequiredFor,
+  OPEN_FOR_ADMIN_STATUSES,
+  serviceFlow,
+  serviceNumber,
+  serviceRequestInput,
+  serviceStatusLabel,
+  type ServiceRequestInput,
+} from "@/lib/service-desk";
 import { db, schema } from "../db";
-import type { DeviceType, ServicePriority, ServiceStatus } from "../db/schema";
-import { applyAssignment, assertAssignableEngineer, autoAssign, lockAssignments, pickEngineer } from "./assignment";
+import type { DeviceType, ServiceNoteKind, ServicePriority, ServiceStatus } from "../db/schema";
+import { notify, notifyAdmins } from "../notifications";
+import { applyAssignment, assertAssignableEngineer, autoAssign, engineerWorkloads, lockAssignments, pickEngineer } from "./assignment";
 import { FieldError } from "./catalogue";
 import { AdminError, audit, isUniqueViolation } from "./tx";
 
@@ -69,62 +84,124 @@ export async function createServiceRequest(actorId: string, input: ServiceReques
 export const statusChangeInput = z.object({
   requestId: z.string().uuid(),
   to: z.enum(Object.keys(serviceStatusLabel) as [ServiceStatus, ...ServiceStatus[]]),
-  note: z.string().trim().max(1000).default(""),
+  note: z.string().trim().max(2000).default(""),
 });
 
+type Actor = { id: string; role: string };
+
+/** Only admins and the job's current engineer may touch it. */
+function assertCanWork(actor: Actor, job: { assignedEngineerId: string | null }) {
+  if (actor.role === "admin") return "admin" as const;
+  if (actor.role === "engineer" && job.assignedEngineerId === actor.id) return "engineer" as const;
+  throw new AdminError("This job isn't assigned to you.");
+}
+
 /**
- * Moves a job along serviceFlow. Engineers may only move their own jobs and can't cancel; completing
- * needs a resolution note and cancelling needs a reason.
+ * Moves a job along the workflow (serviceFlow for admins, engineerFlow for the assigned engineer).
+ * Waiting, giving up, completing and cancelling need a note. The row is locked, so a second
+ * "complete" from a double click finds the job already completed and is refused.
  */
-export async function changeServiceStatus(actor: { id: string; role: string }, input: z.input<typeof statusChangeInput>) {
+export async function changeServiceStatus(actor: Actor, input: z.input<typeof statusChangeInput>) {
   const v = statusChangeInput.parse(input);
   return db.transaction(async (tx) => {
     // Status changes alter workloads, so they queue behind assignment decisions.
     await lockAssignments(tx);
     const [job] = await tx.select().from(schema.serviceRequests).where(eq(schema.serviceRequests.id, v.requestId)).for("update");
     if (!job) throw new AdminError("Service request not found.");
-    const asEngineer = actor.role === "engineer";
-    if (asEngineer && job.assignedEngineerId !== actor.id) throw new AdminError("This job isn't assigned to you.");
-    const allowed = asEngineer ? engineerFlow(job.status) : serviceFlow[job.status];
+    const as = assertCanWork(actor, job);
+    const allowed = as === "engineer" ? engineerFlow(job.status) : serviceFlow[job.status];
     if (!allowed.includes(v.to)) throw new AdminError(`A job that is "${serviceStatusLabel[job.status]}" can't become "${serviceStatusLabel[v.to]}".`);
-    if (v.to === "completed" && !v.note) throw new AdminError("Describe what was done before completing the job.");
-    if (v.to === "cancelled" && !v.note) throw new AdminError("Say why the job is cancelled.");
+    if (noteRequiredFor(v.to) && !v.note) throw new AdminError(`${notePrompt[v.to]}: add a note to continue.`);
 
     const now = new Date();
     await tx
       .update(schema.serviceRequests)
       .set({
         status: v.to,
+        ...(v.to === "accepted" ? { acceptedAt: now } : {}),
         ...(v.to === "completed" ? { completedAt: now, resolution: v.note } : {}),
         ...(v.to === "cancelled" ? { cancelledAt: now } : {}),
       })
       .where(eq(schema.serviceRequests.id, job.id));
-    await tx.insert(schema.serviceEvents).values({ requestId: job.id, fromStatus: job.status, toStatus: v.to, note: v.note || null, actorId: actor.id });
-    if (v.to === "completed" || v.to === "cancelled") {
+    await tx.insert(schema.serviceEvents).values({
+      requestId: job.id,
+      fromStatus: job.status,
+      toStatus: v.to,
+      kind: v.to === "completed" ? "completion" : v.to === "awaiting_parts" ? "parts_required" : "note",
+      note: v.note || null,
+      actorId: actor.id,
+    });
+    if (v.to === "completed" || v.to === "cancelled" || v.to === "unable_to_complete") {
       await tx
         .update(schema.transferRequests)
-        .set({ status: "withdrawn", decidedAt: now, decisionNote: `Job ${v.to}` })
+        .set({ status: "withdrawn", decidedAt: now, decisionNote: `Job ${serviceStatusLabel[v.to].toLowerCase()}` })
         .where(and(eq(schema.transferRequests.requestId, job.id), eq(schema.transferRequests.status, "pending")));
     }
-    if (!asEngineer) {
+
+    const ticket = serviceNumber(job.seq);
+    if (as === "admin") {
       await audit(tx, {
         actorId: actor.id,
         action: "service.status",
         entityType: "service_request",
         entityId: job.id,
-        summary: `${serviceNumber(job.seq)}: ${serviceStatusLabel[job.status]} → ${serviceStatusLabel[v.to]}${v.note ? ` (${v.note})` : ""}`,
+        summary: `${ticket}: ${serviceStatusLabel[job.status]} → ${serviceStatusLabel[v.to]}${v.note ? ` (${v.note})` : ""}`,
       });
+      if (job.assignedEngineerId && (v.to === "cancelled" || v.to === "completed")) {
+        await notify(tx, [job.assignedEngineerId], { kind: `service.${v.to}`, title: `${ticket} was ${v.to} by an admin`, body: v.note, href: `/engineer/jobs/${job.id}` });
+      }
+    } else if (v.to === "unable_to_complete") {
+      await notifyAdmins(tx, { kind: "service.unable", title: `${ticket} handed back: unable to complete`, body: v.note, href: `/admin/service-requests/${job.id}` });
     }
   });
 }
 
-export async function addServiceNote(actor: { id: string; role: string }, requestId: string, note: string) {
-  const text = z.string().trim().min(1, "Write a note.").max(1000).parse(note);
-  const [job] = await db.select().from(schema.serviceRequests).where(eq(schema.serviceRequests.id, requestId));
-  if (!job) throw new AdminError("Service request not found.");
-  if (actor.role === "engineer" && job.assignedEngineerId !== actor.id) throw new AdminError("This job isn't assigned to you.");
-  await db.insert(schema.serviceEvents).values({ requestId, note: text, actorId: actor.id });
+export const workNoteInput = z.object({
+  requestId: z.string().uuid(),
+  kind: z.enum(Object.keys(noteKindLabel) as [ServiceNoteKind, ...ServiceNoteKind[]]),
+  note: z.string().trim().min(1, "Write something first.").max(2000),
+});
+
+/** Adds a progress or work-report entry. Entries are append-only, so earlier reports are never overwritten. */
+export async function addServiceNote(actor: Actor, input: z.input<typeof workNoteInput>) {
+  const v = workNoteInput.parse(input);
+  if (v.kind === "completion") throw new AdminError("The completion report is written by completing the job.");
+  await db.transaction(async (tx) => {
+    const [job] = await tx.select().from(schema.serviceRequests).where(eq(schema.serviceRequests.id, v.requestId)).for("update");
+    if (!job) throw new AdminError("Service request not found.");
+    assertCanWork(actor, job);
+    if (isClosedStatus(job.status) && v.kind !== "follow_up" && v.kind !== "customer_feedback") throw new AdminError("This job is closed. Only follow-up notes and customer feedback can be added.");
+    await tx.insert(schema.serviceEvents).values({ requestId: job.id, kind: v.kind, note: v.note, actorId: actor.id });
+  });
 }
+
+export const scheduleInput = z.object({
+  requestId: z.string().uuid(),
+  /** ISO date-time, or null to clear. */
+  scheduledAt: z.union([z.coerce.date(), z.null()]),
+  note: z.string().trim().max(300).default(""),
+});
+
+/** Sets or clears the visit/bench time. The assigned engineer may schedule their own open jobs; admins any open job. */
+export async function setSchedule(actor: Actor, input: z.input<typeof scheduleInput>) {
+  const v = scheduleInput.parse(input);
+  await db.transaction(async (tx) => {
+    const [job] = await tx.select().from(schema.serviceRequests).where(eq(schema.serviceRequests.id, v.requestId)).for("update");
+    if (!job) throw new AdminError("Service request not found.");
+    const as = assertCanWork(actor, job);
+    if (!isActiveStatus(job.status) && !(as === "admin" && job.status === "open")) throw new AdminError("Only open jobs can be scheduled.");
+    if (v.scheduledAt && Number.isNaN(v.scheduledAt.getTime())) throw new AdminError("Choose a valid date and time.");
+    if (v.scheduledAt && v.scheduledAt.getTime() < Date.now() - 60 * 60 * 1000) throw new AdminError("Choose a time that hasn't passed.");
+    await tx.update(schema.serviceRequests).set({ scheduledAt: v.scheduledAt }).where(eq(schema.serviceRequests.id, job.id));
+    const when = v.scheduledAt ? scheduleFmt.format(v.scheduledAt) : null;
+    await tx.insert(schema.serviceEvents).values({ requestId: job.id, note: `${when ? `Scheduled for ${when}` : "Schedule cleared"}${v.note ? `: ${v.note}` : ""}`, actorId: actor.id });
+    if (as === "admin" && job.assignedEngineerId) {
+      await notify(tx, [job.assignedEngineerId], { kind: "service.scheduled", title: `${serviceNumber(job.seq)} ${when ? `scheduled for ${when}` : "schedule cleared"}`, href: `/engineer/jobs/${job.id}` });
+    }
+  });
+}
+
+const scheduleFmt = new Intl.DateTimeFormat("en-IN", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit", timeZone: "Asia/Kolkata" });
 
 /**
  * Admin override: assign to a chosen engineer (even one marked unavailable or without the skill),
@@ -137,7 +214,7 @@ export async function overrideAssignment(adminId: string, requestId: string, tar
     await lockAssignments(tx);
     const [job] = await tx.select().from(schema.serviceRequests).where(eq(schema.serviceRequests.id, requestId)).for("update");
     if (!job) throw new AdminError("Service request not found.");
-    if (!isActiveStatus(job.status) && job.status !== "open") throw new AdminError("This job is closed.");
+    if (!(OPEN_FOR_ADMIN_STATUSES as readonly string[]).includes(job.status)) throw new AdminError("This job is closed.");
 
     if ("unassign" in target) {
       if (!job.assignedEngineerId) throw new AdminError("The job is already unassigned.");
@@ -172,8 +249,12 @@ export async function requestTransfer(engineerId: string, requestId: string, toE
       if (job.assignedEngineerId !== engineerId) throw new AdminError("You can only ask to transfer jobs assigned to you.");
       if (!isActiveStatus(job.status)) throw new AdminError("This job is closed.");
       const target = await assertAssignableEngineer(tx, toEngineerId);
+      // Same eligibility as automatic assignment: available, takes this device and location.
+      const candidate = (await engineerWorkloads(tx, { deviceType: job.deviceType, location: job.location })).find((e) => e.id === toEngineerId);
+      if (candidate?.ineligible) throw new AdminError(`${target.firstName} can't take this job: ${candidate.ineligible.toLowerCase()}.`);
       const [t] = await tx.insert(schema.transferRequests).values({ requestId, fromEngineerId: engineerId, toEngineerId, reason: why }).returning();
       await tx.insert(schema.serviceEvents).values({ requestId, note: `Transfer to ${target.firstName} requested: ${why}`, actorId: engineerId });
+      await notifyAdmins(tx, { kind: "transfer.requested", title: `Transfer requested for ${serviceNumber(job.seq)}`, body: why, href: "/admin/transfers" });
       return t;
     });
   } catch (err) {
@@ -217,9 +298,11 @@ export async function decideTransfer(adminId: string, transferId: string, approv
       // Mark it decided first: applyAssignment withdraws any request still pending.
       await tx.update(schema.transferRequests).set({ status: "approved", decidedById: adminId, decidedAt: new Date(), decisionNote }).where(eq(schema.transferRequests.id, t.id));
       await applyAssignment(tx, job.id, { engineerId: t.toEngineerId, method: "transfer", reason: t.reason, decidedById: adminId, activeJobsBefore: n });
+      await notify(tx, [t.fromEngineerId], { kind: "transfer.approved", title: `Transfer of ${serviceNumber(job.seq)} approved`, body: decisionNote ?? "", href: "/engineer/transfers" });
     } else {
       await tx.update(schema.transferRequests).set({ status: "rejected", decidedById: adminId, decidedAt: new Date(), decisionNote }).where(eq(schema.transferRequests.id, t.id));
       await tx.insert(schema.serviceEvents).values({ requestId: job.id, note: `Transfer request rejected: ${decisionNote}`, actorId: adminId });
+      await notify(tx, [t.fromEngineerId], { kind: "transfer.rejected", title: `Transfer of ${serviceNumber(job.seq)} rejected`, body: decisionNote ?? "", href: `/engineer/jobs/${job.id}` });
       await audit(tx, { actorId: adminId, action: "service.transfer_reject", entityType: "service_request", entityId: job.id, summary: `${serviceNumber(job.seq)}: rejected transfer request (${decisionNote})` });
     }
   });
@@ -282,7 +365,7 @@ const istDay = (d: string) => new Date(`${d}T00:00:00+05:30`);
 
 export async function searchServiceRequests(f: ServiceQuery = {}) {
   const where: SQL[] = [];
-  if (f.status === "active") where.push(inArray(schema.serviceRequests.status, ["open", ...ACTIVE_SERVICE_STATUSES]));
+  if (f.status === "active") where.push(inArray(schema.serviceRequests.status, OPEN_FOR_ADMIN_STATUSES));
   else if (f.status === "closed") where.push(inArray(schema.serviceRequests.status, ["completed", "cancelled"]));
   else if (f.status) where.push(eq(schema.serviceRequests.status, f.status));
   if (f.deviceType) where.push(eq(schema.serviceRequests.deviceType, f.deviceType));

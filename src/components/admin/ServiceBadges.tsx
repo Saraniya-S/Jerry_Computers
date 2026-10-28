@@ -5,8 +5,11 @@ import type { ServicePriority, ServiceStatus } from "@/lib/server/db/schema";
 const statusTone: Record<ServiceStatus, Tone> = {
   open: "warn",
   assigned: "brand",
+  accepted: "brand",
   in_progress: "info",
   awaiting_parts: "warn",
+  awaiting_customer: "warn",
+  unable_to_complete: "bad",
   completed: "good",
   cancelled: "muted",
 };

@@ -7,7 +7,8 @@ import { z } from "zod";
 import type { ActionResult } from "@/lib/admin/result";
 import { attempt } from "@/lib/server/admin/attempt";
 import { engineerProfileInput, updateEngineerProfile } from "@/lib/server/admin/engineers";
-import { addServiceNote, changeServiceStatus, createServiceRequest, decideTransfer, overrideAssignment, type statusChangeInput } from "@/lib/server/admin/service-requests";
+import { addServiceNote, changeServiceStatus, createServiceRequest, decideTransfer, overrideAssignment, setSchedule, type statusChangeInput } from "@/lib/server/admin/service-requests";
+import { markRead } from "@/lib/server/notifications";
 import { db, schema } from "@/lib/server/db";
 import { requirePermission } from "@/lib/server/permissions";
 import type { ServiceRequestInput } from "@/lib/service-desk";
@@ -57,7 +58,7 @@ export async function changeServiceStatusAction(input: z.input<typeof statusChan
 export async function addServiceNoteAction(requestId: string, note: string): Promise<ActionResult> {
   const admin = await requirePermission("service.manage");
   const res = await attempt(async () => {
-    await addServiceNote(admin, id.parse(requestId), note);
+    await addServiceNote(admin, { requestId: id.parse(requestId), kind: "note", note });
     return "Note added.";
   });
   if (res.ok) refresh();
@@ -95,3 +96,21 @@ export async function updateEngineerProfileAction(userId: string, input: z.input
   return res;
 }
 
+
+export async function setScheduleAction(requestId: string, scheduledAt: string | null): Promise<ActionResult> {
+  const admin = await requirePermission("service.manage");
+  const res = await attempt(async () => {
+    const when = scheduledAt ? new Date(`${z.string().regex(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/, "Choose a date and time.").parse(scheduledAt)}:00+05:30`) : null;
+    await setSchedule(admin, { requestId: id.parse(requestId), scheduledAt: when });
+    return when ? "Scheduled. The engineer has been notified." : "Schedule cleared.";
+  });
+  if (res.ok) refresh();
+  return res;
+}
+
+export async function markAdminNotificationsReadAction(ids?: string[]): Promise<ActionResult> {
+  const admin = await requirePermission("service.manage");
+  await markRead(admin.id, ids ? z.array(id).max(100).parse(ids) : undefined);
+  refresh();
+  return { ok: true, message: "Marked as read." };
+}

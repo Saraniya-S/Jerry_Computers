@@ -37,6 +37,7 @@ describe("automatic engineer assignment", () => {
     expect(new Set([j1.engineer!.id, j2.engineer!.id])).toEqual(new Set([a.id, b.id]));
     // Close a's job: completed. b's job stays active.
     const aJob = j1.engineer!.id === a.id ? j1 : j2;
+    await changeServiceStatus({ id: a.id, role: "engineer" }, { requestId: aJob.id, to: "accepted" });
     await changeServiceStatus({ id: a.id, role: "engineer" }, { requestId: aJob.id, to: "in_progress" });
     await changeServiceStatus({ id: a.id, role: "engineer" }, { requestId: aJob.id, to: "completed", note: "Replaced the adapter" });
     expect((await loads())[a.id]).toBe(0);

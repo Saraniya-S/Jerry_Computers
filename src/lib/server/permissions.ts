@@ -9,12 +9,18 @@ import { requireStaff, type Staff } from "./auth";
  */
 export const permissions = {
   "dashboard.view": ["admin"],
+  /** The /staff workspace. Admins may open it too; their own area stays /admin. */
+  "staffPortal.view": ["admin", "ecommerce_staff"],
   "orders.view": ["admin", "ecommerce_staff"],
   "orders.fulfil": ["admin", "ecommerce_staff"],
   "payments.record": ["admin", "ecommerce_staff"],
   "payments.refund": ["admin"],
+  /** Read-only product and stock lookup. */
+  "catalogue.view": ["admin", "ecommerce_staff"],
   "catalogue.manage": ["admin"],
   "inventory.adjust": ["admin"],
+  /** Read-only customer lookup for processing orders. */
+  "customers.view": ["admin", "ecommerce_staff"],
   "customers.manage": ["admin"],
   "service.manage": ["admin"],
   "engineers.manage": ["admin"],
@@ -30,6 +36,9 @@ export function can(role: UserRole, permission: Permission) {
 }
 
 /** The signed-in staff member, if their role has `permission`; anyone else is redirected away. */
-export function requirePermission(permission: Permission): Promise<Staff> {
-  return requireStaff([...permissions[permission]]);
+export function requirePermission(permission: Permission, signInNext?: string): Promise<Staff> {
+  return requireStaff([...permissions[permission]], signInNext);
 }
+
+/** The admin area itself is for admins only; e-commerce staff work in /staff. */
+export const requireAdmin = () => requireStaff(["admin"]);

@@ -4,6 +4,8 @@ import { z } from "zod";
 import { courierName, dispatchInput, shipmentFlow, shipmentStatusLabel, type DispatchInput } from "@/lib/couriers";
 import { db, schema } from "../db";
 import type { ShipmentStatus } from "../db/schema";
+import { orderNumber } from "@/lib/money";
+import { notifyAdmins } from "../notifications";
 import { AdminError, audit, isUniqueViolation, type Tx } from "./tx";
 
 /** Creates the shipment for an order being dispatched. Called inside the order's status transaction. */
@@ -61,6 +63,20 @@ export async function recordShipmentEvent(actorId: string, input: z.input<typeof
     if (v.status === "delivered" && order.status === "shipped") {
       await tx.update(schema.orders).set({ status: "delivered" }).where(eq(schema.orders.id, order.id));
     }
+    if (v.status === "returned" && order.status === "shipped") {
+      // The parcel came back undelivered. Stock isn't put back automatically: an admin restocks it
+      // through Inventory after checking the goods.
+      await tx
+        .update(schema.orders)
+        .set({ status: "returned", ...(order.paymentStatus === "paid" ? { paymentStatus: "refund_pending" as const } : {}) })
+        .where(eq(schema.orders.id, order.id));
+      await notifyAdmins(tx, {
+        kind: "order.returned",
+        title: `${orderNumber(order.seq)} returned to the shop`,
+        body: `${order.paymentStatus === "paid" ? "Refund due. " : ""}Check the goods and restock them in Inventory.`,
+        href: `/admin/orders/${order.id}`,
+      });
+    }
     await audit(tx, {
       actorId,
       action: "shipment.event",
@@ -69,6 +85,37 @@ export async function recordShipmentEvent(actorId: string, input: z.input<typeof
       summary: `Shipment ${s.trackingNumber}: ${shipmentStatusLabel[v.status]}${v.note ? ` (${v.note})` : ""}`,
     });
   });
+}
+
+/** Fixes a mistyped courier, tracking number or link on a shipment that's still on its way. */
+export async function updateShipmentDetails(actorId: string, shipmentId: string, input: DispatchInput) {
+  const parsed = dispatchInput.safeParse(input);
+  if (!parsed.success) throw new AdminError(parsed.error.issues[0].message);
+  const v = parsed.data;
+  try {
+    await db.transaction(async (tx) => {
+      const [s] = await tx.select().from(schema.shipments).where(eq(schema.shipments.id, shipmentId)).for("update");
+      if (!s) throw new AdminError("Shipment not found.");
+      if (s.status !== "in_transit" && s.status !== "out_for_delivery") throw new AdminError("This shipment is finished; its details can't change.");
+      const name = courierName(v);
+      await tx
+        .update(schema.shipments)
+        .set({ courierCode: v.courierCode, courierName: name, trackingNumber: v.trackingNumber, trackingUrl: v.trackingUrl || null })
+        .where(eq(schema.shipments.id, s.id));
+      await tx.update(schema.orders).set({ courierName: name, trackingNumber: v.trackingNumber }).where(eq(schema.orders.id, s.orderId));
+      await audit(tx, {
+        actorId,
+        action: "shipment.update",
+        entityType: "order",
+        entityId: s.orderId,
+        summary: `Shipment details corrected: ${s.courierName} ${s.trackingNumber} → ${name} ${v.trackingNumber}`,
+        details: { from: { courier: s.courierName, tracking: s.trackingNumber, url: s.trackingUrl }, to: { courier: name, tracking: v.trackingNumber, url: v.trackingUrl || null } },
+      });
+    });
+  } catch (err) {
+    if (isUniqueViolation(err, "shipments_courier_tracking_key")) throw new AdminError(`That tracking number is already used for another shipment with this courier.`);
+    throw err;
+  }
 }
 
 /** Marks the order's open shipment delivered when staff mark the order delivered. */

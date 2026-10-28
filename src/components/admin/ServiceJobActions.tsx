@@ -1,10 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { addServiceNoteAction, changeServiceStatusAction, overrideAssignmentAction } from "@/app/admin/service-requests/actions";
-import { SelectField } from "@/components/forms/controls";
+import { addServiceNoteAction, changeServiceStatusAction, overrideAssignmentAction, setScheduleAction } from "@/app/admin/service-requests/actions";
+import { SelectField, TextField } from "@/components/forms/controls";
 import type { ServiceStatus } from "@/lib/server/db/schema";
-import { serviceStatusLabel } from "@/lib/service-desk";
+import { notePrompt, noteRequiredFor, serviceStatusLabel } from "@/lib/service-desk";
 import { ResultAlert, smallButton, smallPrimary, Spinner, useAdminAction } from "./actions-ui";
 
 const area = "w-full rounded-xl border border-line-strong bg-ink-850 px-3 py-2 text-sm text-fg placeholder:text-fg-dim focus:border-brand focus:ring-4 focus:ring-[var(--brand-glow)]";
@@ -15,7 +15,7 @@ export function StatusChanger({ requestId, next }: { requestId: string; next: Se
   const [note, setNote] = useState("");
   const { run, busy, result } = useAdminAction();
   if (!next.length) return <p className="text-sm text-fg-muted">This job is closed.</p>;
-  const needsNote = to === "completed" || to === "cancelled";
+  const needsNote = to !== "" && noteRequiredFor(to);
   return (
     <form
       className="grid gap-3"
@@ -26,7 +26,7 @@ export function StatusChanger({ requestId, next }: { requestId: string; next: Se
     >
       <SelectField label="Move to" placeholder="Choose a status" options={next.map((s) => ({ value: s, label: serviceStatusLabel[s] }))} value={to} onChange={(e) => setTo(e.target.value as ServiceStatus)} />
       <label className="grid gap-1.5 text-sm font-medium text-fg">
-        {to === "completed" ? "What was done" : to === "cancelled" ? "Why it's cancelled" : "Note"}
+        {(to && notePrompt[to]) || "Note"}
         {!needsNote && <span className="-mt-1 text-xs font-normal text-fg-dim">Optional</span>}
         <textarea rows={3} value={note} onChange={(e) => setNote(e.target.value)} maxLength={1000} style={{ outline: "none" }} className={`${area} font-normal`} />
       </label>
@@ -108,6 +108,40 @@ export function NoteForm({ requestId }: { requestId: string }) {
       <button type="submit" disabled={busy !== null || !note.trim()} className={`${smallButton} w-fit`}>
         {busy && <Spinner />} Add note
       </button>
+    </form>
+  );
+}
+
+const toLocalInput = (d: Date) => {
+  const p = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).formatToParts(d);
+  const g = (t: string) => p.find((x) => x.type === t)?.value;
+  return `${g("year")}-${g("month")}-${g("day")}T${g("hour")}:${g("minute")}`;
+};
+
+/** Admin sets the visit time; the assigned engineer is notified. */
+export function ScheduleSetter({ requestId, current }: { requestId: string; current: Date | null }) {
+  const [value, setValue] = useState(current ? toLocalInput(current) : "");
+  const { run, busy, result } = useAdminAction();
+  return (
+    <form
+      className="grid gap-3"
+      onSubmit={(e) => {
+        e.preventDefault();
+        run("save", () => setScheduleAction(requestId, value || null));
+      }}
+    >
+      <TextField label="Visit or bench time" type="datetime-local" value={value} onChange={(e) => setValue(e.target.value)} hint="Shop time (IST)." />
+      {result && <ResultAlert result={result} />}
+      <div className="flex gap-2">
+        <button type="submit" disabled={busy !== null || !value} className={smallPrimary}>
+          {busy === "save" && <Spinner />} Save time
+        </button>
+        {current && (
+          <button type="button" disabled={busy !== null} onClick={() => run("clear", () => setScheduleAction(requestId, null), (r) => r.ok && setValue(""))} className={smallButton}>
+            Clear
+          </button>
+        )}
+      </div>
     </form>
   );
 }

@@ -96,7 +96,7 @@ export async function logOrderMovements(tx: Tx, orderId: string, actorId: string
 }
 
 /**
- * Units in orders that are placed or packed: already off the shelf count (stock) but still in
+ * Units in orders that are placed, confirmed or packed: already off the shelf count (stock) but still in
  * the building. On hand = stock + reserved.
  */
 export async function reservedByProduct(q: Db = db, productIds?: string[]) {
@@ -105,7 +105,7 @@ export async function reservedByProduct(q: Db = db, productIds?: string[]) {
     .from(schema.orderItems)
     .innerJoin(schema.orders, eq(schema.orders.id, schema.orderItems.orderId))
     .innerJoin(schema.products, eq(schema.products.slug, schema.orderItems.productSlug))
-    .where(and(inArray(schema.orders.status, ["placed", "packed"]), productIds ? inArray(schema.products.id, productIds) : undefined))
+    .where(and(inArray(schema.orders.status, ["placed", "confirmed", "packed"]), productIds ? inArray(schema.products.id, productIds) : undefined))
     .groupBy(schema.products.id);
   return new Map(rows.map((r) => [r.productId, r.reserved]));
 }

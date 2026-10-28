@@ -1,7 +1,7 @@
 import "server-only";
 import { alias } from "drizzle-orm/pg-core";
-import { and, count, desc, eq, gte, isNull, lt, ne, sql } from "drizzle-orm";
-import { ACTIVE_SERVICE_STATUSES } from "@/lib/service-desk";
+import { and, count, desc, eq, gte, isNull, lt, ne, notInArray, sql } from "drizzle-orm";
+import { OPEN_FOR_ADMIN_STATUSES } from "@/lib/service-desk";
 import { db, schema } from "../db";
 import type { DeviceType, OrderStatus, ServiceStatus } from "../db/schema";
 import { listEngineers } from "./engineers";
@@ -49,20 +49,21 @@ export async function dashboardMetrics() {
   const [unpaid] = await db
     .select({ n: count(), value: sum(schema.orders.totalPaise) })
     .from(schema.orders)
-    .where(and(eq(schema.orders.paymentStatus, "pending"), ne(schema.orders.status, "cancelled")));
+    .where(and(eq(schema.orders.paymentStatus, "pending"), notInArray(schema.orders.status, ["cancelled", "returned"])));
 
   const orders = Object.fromEntries(orderRows.map((r) => [r.status, r.n])) as Partial<Record<OrderStatus, number>>;
   const services = Object.fromEntries(serviceRows.map((r) => [r.status, r.n])) as Partial<Record<ServiceStatus, number>>;
   return {
     orders,
     totalOrders: orderRows.reduce((s, r) => s + r.n, 0),
-    pendingOrders: (orders.placed ?? 0) + (orders.packed ?? 0),
+    pendingOrders: (orders.placed ?? 0) + (orders.confirmed ?? 0) + (orders.packed ?? 0),
     unpaid,
     products,
     customers,
     money,
     services,
-    openServices: (services.open ?? 0) + ACTIVE_SERVICE_STATUSES.reduce((s, k) => s + (services[k] ?? 0), 0),
+    openServices: OPEN_FOR_ADMIN_STATUSES.reduce((s, k) => s + (services[k] ?? 0), 0),
+    unableServices: services.unable_to_complete ?? 0,
     unassignedServices: services.open ?? 0,
     engineers,
     pendingTransfers: transfers.n,
@@ -106,8 +107,8 @@ export async function salesReport(r: Range) {
     // Orders placed in the range (whether or not paid yet).
     db
       .select({
-        n: sql<number>`count(*) filter (where ${schema.orders.status} <> 'cancelled')::int`,
-        value: sql<number>`coalesce(sum(${schema.orders.totalPaise}) filter (where ${schema.orders.status} <> 'cancelled'), 0)::int`,
+        n: sql<number>`count(*) filter (where ${schema.orders.status} not in ('cancelled', 'returned'))::int`,
+        value: sql<number>`coalesce(sum(${schema.orders.totalPaise}) filter (where ${schema.orders.status} not in ('cancelled', 'returned')), 0)::int`,
         cancelled: sql<number>`count(*) filter (where ${schema.orders.status} = 'cancelled')::int`,
         cancelledValue: sql<number>`coalesce(sum(${schema.orders.totalPaise}) filter (where ${schema.orders.status} = 'cancelled'), 0)::int`,
       })
@@ -125,10 +126,10 @@ export async function salesReport(r: Range) {
     // Right now, regardless of range.
     db
       .select({
-        codDue: sql<number>`coalesce(sum(${schema.orders.totalPaise}) filter (where ${schema.orders.paymentMethod} = 'cod' and ${schema.orders.paymentStatus} = 'pending' and ${schema.orders.status} <> 'cancelled'), 0)::int`,
-        codDueN: sql<number>`count(*) filter (where ${schema.orders.paymentMethod} = 'cod' and ${schema.orders.paymentStatus} = 'pending' and ${schema.orders.status} <> 'cancelled')::int`,
-        onlineDue: sql<number>`coalesce(sum(${schema.orders.totalPaise}) filter (where ${schema.orders.paymentMethod} = 'online' and ${schema.orders.paymentStatus} = 'pending' and ${schema.orders.status} <> 'cancelled'), 0)::int`,
-        onlineDueN: sql<number>`count(*) filter (where ${schema.orders.paymentMethod} = 'online' and ${schema.orders.paymentStatus} = 'pending' and ${schema.orders.status} <> 'cancelled')::int`,
+        codDue: sql<number>`coalesce(sum(${schema.orders.totalPaise}) filter (where ${schema.orders.paymentMethod} = 'cod' and ${schema.orders.paymentStatus} = 'pending' and ${schema.orders.status} not in ('cancelled', 'returned')), 0)::int`,
+        codDueN: sql<number>`count(*) filter (where ${schema.orders.paymentMethod} = 'cod' and ${schema.orders.paymentStatus} = 'pending' and ${schema.orders.status} not in ('cancelled', 'returned'))::int`,
+        onlineDue: sql<number>`coalesce(sum(${schema.orders.totalPaise}) filter (where ${schema.orders.paymentMethod} = 'online' and ${schema.orders.paymentStatus} = 'pending' and ${schema.orders.status} not in ('cancelled', 'returned')), 0)::int`,
+        onlineDueN: sql<number>`count(*) filter (where ${schema.orders.paymentMethod} = 'online' and ${schema.orders.paymentStatus} = 'pending' and ${schema.orders.status} not in ('cancelled', 'returned'))::int`,
         refundDue: sql<number>`coalesce(sum(${schema.orders.totalPaise}) filter (where ${schema.orders.paymentStatus} = 'refund_pending'), 0)::int`,
         refundDueN: sql<number>`count(*) filter (where ${schema.orders.paymentStatus} = 'refund_pending')::int`,
       })

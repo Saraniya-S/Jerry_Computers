@@ -6,10 +6,12 @@ import type { AddressSnapshot, Invoice, OrderStatus, PaymentStatus } from "@/lib
 /** Order pieces shared by the customer and admin areas. */
 
 const statusStyle: Record<OrderStatus, string> = {
-  placed: "bg-ink-900 text-fg-muted",
+  placed: "bg-amber-100 text-amber-800",
+  confirmed: "bg-ink-900 text-fg-muted",
   packed: "bg-brand/10 text-brand",
   shipped: "bg-sky-100 text-sky-800",
   delivered: "bg-mint-soft text-leaf",
+  returned: "bg-red-50 text-red-700",
   cancelled: "bg-ink-900 text-fg-dim line-through",
 };
 

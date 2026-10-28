@@ -5,12 +5,14 @@ import { useState } from "react";
 import { recordPaymentAction, recordRefundAction, resendInvoiceAction, updateStatusAction } from "@/app/admin/actions";
 import { SelectField, TextField } from "@/components/forms/controls";
 import { couriers, type CourierCode } from "@/lib/couriers";
+import type { OrderStatus } from "@/lib/server/db/schema";
 import { ConfirmDialog, ResultAlert, Spinner, useAdminAction } from "./actions-ui";
 
-type Next = "packed" | "shipped" | "delivered" | "cancelled";
+type Next = "confirmed" | "packed" | "shipped" | "delivered" | "cancelled";
 
 type Props = {
   orderId: string;
+  status: OrderStatus;
   next: Next[];
   canRecordPayment: boolean;
   paymentMethod: "cod" | "online";
@@ -19,10 +21,13 @@ type Props = {
   waitingForPayment: boolean;
   /** A cancelled paid order whose refund isn't recorded yet, and the viewer may record it. */
   canRecordRefund: boolean;
+  /** COD not dispatched yet: payment can't be recorded until the courier collects it. */
+  codWaitsForDispatch?: boolean;
+  invoiceHref: string;
 };
 
 /** Payment, fulfilment and invoice actions for one order. */
-export function OrderActions({ orderId, next, canRecordPayment, paymentMethod, hasInvoice, waitingForPayment, canRecordRefund }: Props) {
+export function OrderActions({ orderId, status, next, canRecordPayment, paymentMethod, hasInvoice, waitingForPayment, canRecordRefund, codWaitsForDispatch, invoiceHref }: Props) {
   const [reference, setReference] = useState("");
   const [refundRef, setRefundRef] = useState("");
   const [shipment, setShipment] = useState({ courierCode: "" as CourierCode | "", courierName: "", trackingNumber: "", trackingUrl: "" });
@@ -63,10 +68,16 @@ export function OrderActions({ orderId, next, canRecordPayment, paymentMethod, h
             )}
           </>
         )}
-        {waitingForPayment && <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">Online order: record the payment before packing or shipping.</p>}
+        {waitingForPayment && <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">Online order: record the payment (after checking the bank or UPI statement) before packing or shipping.</p>}
+        {codWaitsForDispatch && <p className="rounded-lg bg-ink-950 px-3 py-2 text-xs text-fg-muted">Cash on delivery: payment is recorded after dispatch, once the courier has collected it.</p>}
+        {next.includes("confirmed") && (
+          <button type="button" onClick={() => go("confirmed", () => updateStatusAction({ orderId, to: "confirmed" }))} disabled={busy !== null} className={primary}>
+            {spin("confirmed")} Confirm order
+          </button>
+        )}
         {next.includes("packed") && (
           <button type="button" onClick={() => go("packed", () => updateStatusAction({ orderId, to: "packed" }))} disabled={busy !== null} className={btn}>
-            {spin("packed")} Mark as packed
+            {spin("packed")} Mark as packed (ready to ship)
           </button>
         )}
         {next.includes("shipped") && (
@@ -115,7 +126,7 @@ export function OrderActions({ orderId, next, canRecordPayment, paymentMethod, h
         )}
         {hasInvoice && (
           <>
-            <a href={`/admin/orders/${orderId}/invoice`} className={btn}>
+            <a href={invoiceHref} className={btn}>
               <Download className="size-4" aria-hidden /> Download invoice PDF
             </a>
             <button type="button" onClick={() => go("resend", () => resendInvoiceAction(orderId))} disabled={busy !== null} className={btn}>
@@ -140,13 +151,13 @@ export function OrderActions({ orderId, next, canRecordPayment, paymentMethod, h
         )}
         {next.includes("cancelled") && (
           <ConfirmDialog
-            title="Cancel this order?"
-            confirmLabel="Cancel order"
-            reason="Reason for cancelling"
+            title={status === "placed" ? "Reject this order?" : "Cancel this order?"}
+            confirmLabel={status === "placed" ? "Reject order" : "Cancel order"}
+            reason={status === "placed" ? "Reason for rejecting (e.g. can't deliver to this PIN code)" : "Reason for cancelling"}
             onConfirm={(cancelReason) => updateStatusAction({ orderId, to: "cancelled", cancelReason })}
             trigger={(o) => (
               <button type="button" onClick={o} disabled={busy !== null} className={`${btn} border-red-200 text-red-700 hover:bg-red-50`}>
-                Cancel order
+                {status === "placed" ? "Reject order" : "Cancel order"}
               </button>
             )}
           >

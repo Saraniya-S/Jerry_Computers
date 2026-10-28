@@ -4,8 +4,12 @@ import { type AnyPgColumn, boolean, check, index, integer, jsonb, pgEnum, pgTabl
 export const userRole = pgEnum("user_role", ["customer", "engineer", "ecommerce_staff", "admin"]);
 export const otpPurpose = pgEnum("otp_purpose", ["register", "login"]);
 export const customerType = pgEnum("customer_type", ["personal", "business"]);
-/** Fulfilment progress. Payment is tracked separately in paymentStatus. */
-export const orderStatus = pgEnum("order_status", ["placed", "packed", "shipped", "delivered", "cancelled"]);
+/**
+ * Fulfilment progress. Payment is tracked separately in paymentStatus. placed → confirmed (staff
+ * accepted it) → packed (ready to ship) → shipped → delivered; returned when the courier brings the
+ * parcel back; cancelled before dispatch.
+ */
+export const orderStatus = pgEnum("order_status", ["placed", "confirmed", "packed", "shipped", "delivered", "returned", "cancelled"]);
 /** refund_pending: a paid order was cancelled and the money still has to go back; refunded: a refund is recorded. */
 export const paymentStatus = pgEnum("payment_status", ["pending", "paid", "refund_pending", "refunded"]);
 export const tokenPurpose = pgEnum("token_purpose", ["invite", "reset"]);
@@ -536,10 +540,33 @@ export const servicePriority = pgEnum("service_priority", ["low", "normal", "hig
 export const serviceLocation = pgEnum("service_location", ["in_shop", "on_site"]);
 export const serviceSource = pgEnum("service_source", ["online", "walk_in", "phone"]);
 /**
- * open: nobody assigned yet. assigned / in_progress / awaiting_parts count as an engineer's
- * active workload (see ACTIVE_SERVICE_STATUSES). completed and cancelled are closed.
+ * open: nobody assigned yet. assigned, accepted, in_progress, awaiting_parts and awaiting_customer
+ * count as an engineer's active workload (see ACTIVE_SERVICE_STATUSES). unable_to_complete is
+ * handed back to an admin to reassign or cancel. completed and cancelled are closed.
  */
-export const serviceStatus = pgEnum("service_status", ["open", "assigned", "in_progress", "awaiting_parts", "completed", "cancelled"]);
+export const serviceStatus = pgEnum("service_status", [
+  "open",
+  "assigned",
+  "accepted",
+  "in_progress",
+  "awaiting_parts",
+  "awaiting_customer",
+  "unable_to_complete",
+  "completed",
+  "cancelled",
+]);
+/** What a progress-log entry records. Entries are only ever added, never edited. */
+export const serviceNoteKind = pgEnum("service_note_kind", [
+  "note",
+  "inspection",
+  "diagnosis",
+  "work_done",
+  "parts_used",
+  "parts_required",
+  "customer_feedback",
+  "completion",
+  "follow_up",
+]);
 
 /** Engineer-only settings. Every engineer gets a row; eligibility for new jobs reads it. */
 export const engineerProfiles = pgTable("engineer_profiles", {
@@ -558,7 +585,8 @@ export const engineerProfiles = pgTable("engineer_profiles", {
     .$onUpdate(() => new Date()),
 });
 
-export type ServiceAddress = AddressSnapshot & { mapsUrl: string | null };
+/** latitude/longitude are set only when a real pin was captured; never guessed from the address. */
+export type ServiceAddress = AddressSnapshot & { mapsUrl: string | null; latitude?: number | null; longitude?: number | null };
 
 export const serviceRequests = pgTable(
   "service_requests",
@@ -587,6 +615,10 @@ export const serviceRequests = pgTable(
     status: serviceStatus("status").notNull().default("open"),
     assignedEngineerId: uuid("assigned_engineer_id").references(() => users.id, { onDelete: "restrict" }),
     assignedAt: timestamp("assigned_at", { withTimezone: true }),
+    /** Agreed visit or bench time, set by the admin or the assigned engineer. */
+    scheduledAt: timestamp("scheduled_at", { withTimezone: true }),
+    /** When the current engineer accepted the job; cleared when it moves to someone else. */
+    acceptedAt: timestamp("accepted_at", { withTimezone: true }),
     resolution: text("resolution"),
     completedAt: timestamp("completed_at", { withTimezone: true }),
     cancelledAt: timestamp("cancelled_at", { withTimezone: true }),
@@ -601,6 +633,7 @@ export const serviceRequests = pgTable(
     uniqueIndex("service_requests_seq_key").on(t.seq),
     index("service_requests_status_idx").on(t.status),
     index("service_requests_engineer_idx").on(t.assignedEngineerId, t.status),
+    index("service_requests_scheduled_idx").on(t.assignedEngineerId, t.scheduledAt),
     index("service_requests_customer_idx").on(t.customerId),
     index("service_requests_created_idx").on(t.createdAt),
     check("service_requests_on_site_address", sql`${t.location} = 'in_shop' or ${t.serviceAddress} is not null`),
@@ -617,6 +650,7 @@ export const serviceEvents = pgTable(
       .references(() => serviceRequests.id, { onDelete: "cascade" }),
     fromStatus: serviceStatus("from_status"),
     toStatus: serviceStatus("to_status"),
+    kind: serviceNoteKind("kind").notNull().default("note"),
     note: text("note"),
     actorId: uuid("actor_id").references(() => users.id, { onDelete: "set null" }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
@@ -709,6 +743,42 @@ export type ServiceStatus = (typeof serviceStatus.enumValues)[number];
 export type DeviceType = (typeof deviceType.enumValues)[number];
 export type ServicePriority = (typeof servicePriority.enumValues)[number];
 export type TransferStatus = (typeof transferStatus.enumValues)[number];
+export type ServiceNoteKind = (typeof serviceNoteKind.enumValues)[number];
+
+/** In-app messages for staff (assignments, transfer decisions, cancellations). No email is sent from these. */
+export const notifications = pgTable(
+  "notifications",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    /** e.g. "service.assigned", "transfer.approved". */
+    kind: text("kind").notNull(),
+    title: text("title").notNull(),
+    body: text("body").notNull().default(""),
+    href: text("href"),
+    readAt: timestamp("read_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("notifications_user_idx").on(t.userId, t.createdAt), index("notifications_unread_idx").on(t.userId).where(sql`${t.readAt} is null`)],
+);
+export type Notification = typeof notifications.$inferSelect;
+
+/** Internal staff notes on an order. Never shown to the customer; append-only. */
+export const orderNotes = pgTable(
+  "order_notes",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    orderId: uuid("order_id")
+      .notNull()
+      .references(() => orders.id, { onDelete: "cascade" }),
+    authorId: uuid("author_id").references(() => users.id, { onDelete: "set null" }),
+    body: text("body").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("order_notes_order_idx").on(t.orderId, t.createdAt)],
+);
 
 export type ProductRow = typeof products.$inferSelect;
 export type ServiceRow = typeof services.$inferSelect;

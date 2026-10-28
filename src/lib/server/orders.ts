@@ -1,5 +1,5 @@
 import "server-only";
-import { and, asc, count, desc, eq, gte, ilike, inArray, lt, ne, or, sql, type SQL } from "drizzle-orm";
+import { and, asc, count, desc, eq, gte, ilike, inArray, lt, notInArray, or, sql, type SQL } from "drizzle-orm";
 import { canBuy, getCategory } from "@/data/products";
 import { shippingFor } from "@/lib/settings";
 import { getCatalogue } from "./catalogue";
@@ -10,6 +10,7 @@ import { logOrderMovements } from "./admin/inventory";
 import { createShipmentTx, deliverShipmentsTx, shipmentsForOrders } from "./admin/shipments";
 import { audit } from "./admin/tx";
 import type { AddressSnapshot, InvoiceLine, OrderStatus, PaymentStatus } from "./db/schema";
+import { notify, notifyAdmins } from "./notifications";
 import { getSettings } from "./settings";
 
 export class OrderError extends Error {}
@@ -88,6 +89,15 @@ export async function placeOrder(userId: string, input: { addressId: string; pay
       })),
     );
     await logOrderMovements(tx, order.id, userId, moved, "order_placed");
+    const staff = await tx
+      .select({ id: schema.users.id })
+      .from(schema.users)
+      .where(and(eq(schema.users.role, "ecommerce_staff"), sql`${schema.users.disabledAt} is null`));
+    await notify(
+      tx,
+      staff.map((u) => u.id),
+      { kind: "order.placed", title: `New order ${orderNumber(order.seq)}`, body: `${input.paymentMethod === "cod" ? "Cash on delivery" : "Online payment"} · ${lines.length} item${lines.length === 1 ? "" : "s"}`, href: `/staff/orders/${order.id}` },
+    );
     await tx.delete(schema.cartItems).where(eq(schema.cartItems.userId, userId));
     return order;
   });
@@ -141,7 +151,10 @@ export type OrderQuery = {
   /** Placed on or after / before these dates (yyyy-mm-dd, shop time is IST). */
   from?: string;
   to?: string;
-  sort?: "newest" | "oldest" | "total_desc" | "total_asc";
+  sort?: "newest" | "oldest" | "updated" | "total_desc" | "total_asc";
+  /** Only these orders (used by the dashboards). */
+  ids?: string[];
+  customerId?: string;
   page?: number;
   pageSize?: number;
 };
@@ -150,9 +163,11 @@ const istDay = (d: string) => new Date(`${d}T00:00:00+05:30`);
 
 function orderWhere(f: OrderQuery & { filter?: OrderFilter }) {
   const where: SQL[] = [];
-  if (f.filter === "unpaid") where.push(eq(schema.orders.paymentStatus, "pending"), ne(schema.orders.status, "cancelled"));
+  if (f.filter === "unpaid") where.push(eq(schema.orders.paymentStatus, "pending"), notInArray(schema.orders.status, ["cancelled", "returned"]));
   else if (f.filter) where.push(eq(schema.orders.status, f.filter));
   if (f.status) where.push(eq(schema.orders.status, f.status));
+  if (f.ids) where.push(inArray(schema.orders.id, f.ids));
+  if (f.customerId) where.push(eq(schema.orders.userId, f.customerId));
   if (f.paymentMethod) where.push(eq(schema.orders.paymentMethod, f.paymentMethod));
   if (f.paymentStatus) where.push(eq(schema.orders.paymentStatus, f.paymentStatus));
   if (f.from) where.push(gte(schema.orders.createdAt, istDay(f.from)));
@@ -177,6 +192,7 @@ function orderWhere(f: OrderQuery & { filter?: OrderFilter }) {
 const orderSort = {
   newest: [desc(schema.orders.createdAt)],
   oldest: [asc(schema.orders.createdAt)],
+  updated: [desc(schema.orders.updatedAt)],
   total_desc: [desc(schema.orders.totalPaise), desc(schema.orders.createdAt)],
   total_asc: [asc(schema.orders.totalPaise), desc(schema.orders.createdAt)],
 };
@@ -236,7 +252,7 @@ export async function orderStats() {
     db
       .select({ n: count() })
       .from(schema.orders)
-      .where(and(eq(schema.orders.paymentStatus, "pending"), ne(schema.orders.status, "cancelled"))),
+      .where(and(eq(schema.orders.paymentStatus, "pending"), notInArray(schema.orders.status, ["cancelled", "returned"]))),
     db.select({ n: count() }).from(schema.users).where(eq(schema.users.role, "customer")),
     db
       .select({ total: sql<number>`coalesce(sum(${schema.orders.totalPaise}), 0)::int`, n: count() })
@@ -286,6 +302,7 @@ export async function recordPayment(orderId: string, reference: string, staffId:
     if (!order) throw new OrderError("Order not found.");
     if (order.status === "cancelled") throw new OrderError("This order is cancelled.");
     if (order.paymentStatus !== "pending") throw new OrderError("Payment is already recorded for this order.");
+    if (!canRecordPayment(order)) throw new OrderError("Cash on delivery is collected by the courier: record it once the order has been dispatched.");
     if (order.paymentMethod === "online" && !reference.trim()) throw new OrderError("Enter the UPI or bank transaction ID you checked the payment against.");
 
     const [customer] = await tx.select().from(schema.users).where(eq(schema.users.id, order.userId));
@@ -377,16 +394,28 @@ export async function recordRefund(orderId: string, reference: string, staffId: 
 }
 
 const flow: Record<OrderStatus, OrderStatus[]> = {
-  placed: ["packed", "shipped", "cancelled"],
+  placed: ["confirmed", "cancelled"],
+  confirmed: ["packed", "cancelled"],
   packed: ["shipped", "cancelled"],
   shipped: ["delivered"],
   delivered: [],
+  // Set by recording a "returned" shipment update, not by hand.
+  returned: [],
   cancelled: [],
 };
 
-/** Next fulfilment steps. Online orders wait for payment before packing or shipping. */
+/**
+ * Next fulfilment steps. Staff confirm a new order (or reject it by cancelling); packing and
+ * dispatch then need a recorded payment for online orders.
+ */
 export function allowedNext(order: { status: OrderStatus; paymentMethod: "cod" | "online"; paymentStatus: PaymentStatus }) {
-  return flow[order.status].filter((s) => s === "cancelled" || order.paymentMethod === "cod" || order.paymentStatus === "paid");
+  return flow[order.status].filter((s) => s === "cancelled" || s === "confirmed" || order.paymentMethod === "cod" || order.paymentStatus === "paid");
+}
+
+/** Cash on delivery is collected by the courier, so it can only be recorded once the parcel has gone out. */
+export function canRecordPayment(order: { status: OrderStatus; paymentMethod: "cod" | "online"; paymentStatus: PaymentStatus }) {
+  if (order.paymentStatus !== "pending" || order.status === "cancelled" || order.status === "returned") return false;
+  return order.paymentMethod === "online" || order.status === "shipped" || order.status === "delivered";
 }
 
 type StatusExtras = { shipment?: DispatchInput; cancelReason?: string };
@@ -433,6 +462,9 @@ export async function updateOrderStatus(orderId: string, to: OrderStatus, actorI
         ...(to === "cancelled" && order.paymentStatus === "paid" ? { paymentStatus: "refund_pending" as const } : {}),
       })
       .where(eq(schema.orders.id, orderId));
+    if (to === "cancelled" && order.paymentStatus === "paid") {
+      await notifyAdmins(tx, { kind: "order.refund_due", title: `Refund due on ${orderNumber(order.seq)}`, body: extras.cancelReason?.trim() ?? "", href: `/admin/orders/${orderId}` });
+    }
     await audit(tx, {
       actorId,
       action: "order.status",
@@ -442,3 +474,44 @@ export async function updateOrderStatus(orderId: string, to: OrderStatus, actorI
     });
   });
 }
+
+/* Internal notes and timeline */
+
+export async function addOrderNote(orderId: string, authorId: string, body: string) {
+  const text = body.trim();
+  if (!text) throw new OrderError("Write the note first.");
+  if (text.length > 1000) throw new OrderError("Keep notes under 1,000 characters.");
+  await db.transaction(async (tx) => {
+    const [order] = await tx.select({ id: schema.orders.id }).from(schema.orders).where(eq(schema.orders.id, orderId));
+    if (!order) throw new OrderError("Order not found.");
+    await tx.insert(schema.orderNotes).values({ orderId, authorId, body: text });
+  });
+}
+
+/**
+ * Everything that happened to an order, oldest first: placement, the audited staff actions
+ * (status, payment, refund, shipment updates) and internal notes.
+ */
+export async function orderTimeline(orderId: string) {
+  const [order] = await db.select({ createdAt: schema.orders.createdAt }).from(schema.orders).where(eq(schema.orders.id, orderId));
+  if (!order) return [];
+  const [logs, notes] = await Promise.all([
+    db
+      .select({ log: schema.auditLogs, first: schema.users.firstName, last: schema.users.lastName })
+      .from(schema.auditLogs)
+      .leftJoin(schema.users, eq(schema.users.id, schema.auditLogs.actorId))
+      .where(and(eq(schema.auditLogs.entityType, "order"), eq(schema.auditLogs.entityId, orderId))),
+    db
+      .select({ note: schema.orderNotes, first: schema.users.firstName, last: schema.users.lastName })
+      .from(schema.orderNotes)
+      .leftJoin(schema.users, eq(schema.users.id, schema.orderNotes.authorId))
+      .where(eq(schema.orderNotes.orderId, orderId)),
+  ]);
+  const name = (f: string | null, l: string | null) => (f ? `${f} ${l ?? ""}`.trim() : null);
+  return [
+    { id: "placed", kind: "placed" as const, text: "Order placed by the customer", by: null, at: order.createdAt },
+    ...logs.map((r) => ({ id: r.log.id, kind: "action" as const, text: r.log.summary, by: name(r.first, r.last), at: r.log.createdAt })),
+    ...notes.map((r) => ({ id: r.note.id, kind: "note" as const, text: r.note.body, by: name(r.first, r.last), at: r.note.createdAt })),
+  ].sort((a, b) => a.at.getTime() - b.at.getTime());
+}
+export type TimelineEntry = Awaited<ReturnType<typeof orderTimeline>>[number];

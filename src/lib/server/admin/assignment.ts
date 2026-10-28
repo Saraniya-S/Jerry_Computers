@@ -1,8 +1,9 @@
 import "server-only";
 import { and, eq, inArray, isNotNull, isNull, sql } from "drizzle-orm";
-import { ACTIVE_SERVICE_STATUSES, isActiveStatus, serviceNumber } from "@/lib/service-desk";
+import { ACTIVE_SERVICE_STATUSES, OPEN_FOR_ADMIN_STATUSES, serviceNumber } from "@/lib/service-desk";
 import { db, schema } from "../db";
 import type { DeviceType } from "../db/schema";
+import { notify } from "../notifications";
 import { AdminError, audit, type Db, type Tx } from "./tx";
 
 /**
@@ -94,19 +95,20 @@ type AssignOpts = {
 
 /**
  * Points a locked job at an engineer (or nobody) and records it in the assignment history and the
- * job's progress log. Any pending transfer request for the job is withdrawn, since it no longer
- * describes the current assignment. Call inside a transaction after lockAssignments.
+ * job's progress log. A job that changes hands starts again at "assigned" for the new engineer to
+ * accept. Any pending transfer request is withdrawn, since it no longer describes the current
+ * assignment. Both engineers are notified. Call inside a transaction after lockAssignments.
  */
 export async function applyAssignment(tx: Tx, requestId: string, opts: AssignOpts) {
   const [job] = await tx.select().from(schema.serviceRequests).where(eq(schema.serviceRequests.id, requestId)).for("update");
   if (!job) throw new AdminError("Service request not found.");
-  if (!isActiveStatus(job.status) && job.status !== "open") throw new AdminError("This job is closed.");
+  if (!(OPEN_FOR_ADMIN_STATUSES as readonly string[]).includes(job.status)) throw new AdminError("This job is closed.");
   if (job.assignedEngineerId === opts.engineerId) throw new AdminError("The job is already assigned that way.");
 
-  const status = opts.engineerId ? (job.status === "open" ? "assigned" : job.status) : "open";
+  const status = opts.engineerId ? "assigned" : "open";
   await tx
     .update(schema.serviceRequests)
-    .set({ assignedEngineerId: opts.engineerId, assignedAt: opts.engineerId ? new Date() : null, status })
+    .set({ assignedEngineerId: opts.engineerId, assignedAt: opts.engineerId ? new Date() : null, acceptedAt: null, status })
     .where(eq(schema.serviceRequests.id, requestId));
   await tx.insert(schema.serviceAssignments).values({
     requestId,
@@ -139,6 +141,23 @@ export async function applyAssignment(tx: Tx, requestId: string, opts: AssignOpt
     .update(schema.transferRequests)
     .set({ status: "withdrawn", decidedAt: new Date(), decisionNote: "Assignment changed before a decision" })
     .where(and(eq(schema.transferRequests.requestId, requestId), eq(schema.transferRequests.status, "pending")));
+
+  const ticket = serviceNumber(job.seq);
+  if (opts.engineerId) {
+    await notify(tx, [opts.engineerId], {
+      kind: "service.assigned",
+      title: `New job ${ticket}`,
+      body: opts.method === "transfer" ? `Transferred to you from ${names.get(job.assignedEngineerId!)}.` : "Assigned to you. Open it to accept.",
+      href: `/engineer/jobs/${requestId}`,
+    });
+  }
+  if (job.assignedEngineerId) {
+    await notify(tx, [job.assignedEngineerId], {
+      kind: "service.unassigned",
+      title: `${ticket} moved off your list`,
+      body: opts.engineerId ? `Now with ${to}.` : "It is waiting to be reassigned.",
+    });
+  }
 
   if (opts.decidedById && opts.method !== "auto") {
     await audit(tx, {

@@ -7,7 +7,7 @@ import { getSessionUser } from "./session";
 export const roleHome: Record<UserRole, string> = {
   customer: "/account",
   engineer: "/engineer",
-  ecommerce_staff: "/admin/orders",
+  ecommerce_staff: "/staff",
   admin: "/admin",
 };
 
@@ -74,9 +74,9 @@ export function safeNext(next: unknown, fallback: string) {
 export type Staff = { id: string; role: UserRole; firstName: string; lastName: string; email: string; isSuperAdmin: boolean };
 
 /** A signed-in staff member (admin, e-commerce or engineer) whose role is in `allowed`. */
-export async function requireStaff(allowed: UserRole[] = ["admin", "ecommerce_staff"]): Promise<Staff> {
+export async function requireStaff(allowed: UserRole[] = ["admin", "ecommerce_staff"], signInNext?: string): Promise<Staff> {
   const user = await getSessionUser();
-  if (!user) redirect("/login?next=/admin");
+  if (!user) redirect(`/login?next=${signInNext ?? (allowed.length === 1 && allowed[0] === "engineer" ? "/engineer" : "/admin")}`);
   if (!allowed.includes(user.role)) redirect(roleHome[user.role]);
   return { id: user.id, role: user.role, firstName: user.firstName, lastName: user.lastName, email: user.email, isSuperAdmin: user.isSuperAdmin };
 }

@@ -5,10 +5,10 @@ import { z } from "zod";
 import type { DispatchInput } from "@/lib/couriers";
 import type { ActionResult } from "@/lib/admin/result";
 import { attempt } from "@/lib/server/admin/attempt";
-import { recordShipmentEvent, type shipmentEventInput } from "@/lib/server/admin/shipments";
+import { recordShipmentEvent, updateShipmentDetails, type shipmentEventInput } from "@/lib/server/admin/shipments";
 import { CATALOGUE_TAG } from "@/lib/server/catalogue";
 import { emailInvoice } from "@/lib/server/invoicing";
-import { OrderError, recordPayment, recordRefund, updateOrderStatus } from "@/lib/server/orders";
+import { addOrderNote, OrderError, recordPayment, recordRefund, updateOrderStatus } from "@/lib/server/orders";
 import { requirePermission } from "@/lib/server/permissions";
 
 export type AdminResult = ActionResult;
@@ -64,7 +64,7 @@ export async function recordRefundAction(orderId: string, reference: string): Pr
 
 const statusSchema = z.object({
   orderId: z.string().uuid(),
-  to: z.enum(["packed", "shipped", "delivered", "cancelled"]),
+  to: z.enum(["confirmed", "packed", "shipped", "delivered", "cancelled"]),
   cancelReason: z.string().trim().max(300).optional(),
 });
 
@@ -76,10 +76,11 @@ export async function updateStatusAction(input: z.input<typeof statusSchema> & {
   const res = await attempt(async () => {
     await updateOrderStatus(orderId, to, staff.id, { shipment: input.shipment, cancelReason });
     const messages = {
-      packed: "Marked as packed.",
+      confirmed: "Order confirmed. Pack it next.",
+      packed: "Marked as packed and ready to ship.",
       shipped: "Dispatched. The shipment and tracking number are on the order.",
       delivered: "Marked as delivered.",
-      cancelled: "Order cancelled and stock returned.",
+      cancelled: "Order cancelled and its stock put back on sale.",
     };
     return messages[to];
   });
@@ -95,6 +96,27 @@ export async function shipmentEventAction(input: z.input<typeof shipmentEventInp
   const res = await attempt(async () => {
     await recordShipmentEvent(staff.id, input);
     return "Shipment updated.";
+  });
+  if (res.ok) refresh();
+  return res;
+}
+
+/** Corrects the courier, tracking number or link on a shipment that's still on its way. */
+export async function updateShipmentAction(shipmentId: string, input: DispatchInput): Promise<AdminResult> {
+  const staff = await requirePermission("orders.fulfil");
+  const res = await attempt(async () => {
+    await updateShipmentDetails(staff.id, uuid.parse(shipmentId), input);
+    return "Shipment details updated.";
+  });
+  if (res.ok) refresh();
+  return res;
+}
+
+export async function addOrderNoteAction(orderId: string, note: string): Promise<AdminResult> {
+  const staff = await requirePermission("orders.fulfil");
+  const res = await attempt(async () => {
+    await addOrderNote(uuid.parse(orderId), staff.id, z.string().max(2000).parse(note));
+    return "Note added.";
   });
   if (res.ok) refresh();
   return res;

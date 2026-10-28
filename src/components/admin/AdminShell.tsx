@@ -3,6 +3,7 @@
 import Link from "next/link";
 import {
   ArrowLeftRight,
+  Bell,
   Boxes,
   ChartColumn,
   ClipboardList,
@@ -22,7 +23,6 @@ import {
 } from "lucide-react";
 import type { ReactNode } from "react";
 import { DashboardShell, type NavGroup } from "@/components/account/DashboardShell";
-import { useSession } from "@/lib/client/session";
 
 /** Mirrors src/lib/server/permissions.ts; the pages and actions enforce it on the server. */
 const adminGroups: NavGroup[] = [
@@ -32,6 +32,7 @@ const adminGroups: NavGroup[] = [
       { href: "/admin", label: "Overview", icon: LayoutDashboard, exact: true },
       { href: "/admin/reports", label: "Reports", icon: ChartColumn },
       { href: "/admin/activity", label: "Activity log", icon: ScrollText },
+      { href: "/admin/notifications", label: "Notifications", icon: Bell },
     ],
   },
   {
@@ -69,16 +70,12 @@ const adminGroups: NavGroup[] = [
   { label: "Team", items: [{ href: "/admin/team", label: "Staff accounts", icon: UserCog }] },
 ];
 
-/** Orders are the only section e-commerce staff can open. */
-const staffGroups: NavGroup[] = [{ label: "Sales", items: [{ href: "/admin/orders", label: "Orders", icon: Package }] }];
-
-/** Admin and e-commerce staff area, on the same shell as the customer area. */
+/** Admin area, on the same shell as the customer, engineer and staff areas. */
 export function AdminShell({ userMenu, children }: { userMenu: ReactNode; children: ReactNode }) {
-  const { viewer } = useSession();
   return (
     <DashboardShell
-      groups={viewer?.role === "admin" ? adminGroups : staffGroups}
-      root={{ href: viewer?.role === "admin" ? "/admin" : "/admin/orders", label: "Admin" }}
+      groups={adminGroups}
+      root={{ href: "/admin", label: "Admin" }}
       userMenu={userMenu}
       actions={
         <Link

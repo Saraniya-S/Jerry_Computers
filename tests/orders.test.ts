@@ -21,7 +21,8 @@ describe("payments", () => {
     await expect(recordPayment(o.id, "  ", staff.id)).rejects.toThrow(/transaction ID/);
     const [still] = await db.select().from(schema.orders).where(eq(schema.orders.id, o.id));
     expect(still.paymentStatus).toBe("pending");
-    // Online orders can't be packed or shipped until paid.
+    // Online orders can be confirmed, but not packed or shipped until paid.
+    await updateOrderStatus(o.id, "confirmed", staff.id);
     await expect(updateOrderStatus(o.id, "packed", staff.id)).rejects.toThrow(/Record the online payment/);
   });
 
@@ -37,8 +38,8 @@ describe("payments", () => {
 
   it("cancelling a paid order makes a refund due, returns stock, and the refund closes it", async () => {
     const p = await makeProduct({ stock: 4 });
-    const o = await makeOrder(customer.id, p);
-    await recordPayment(o.id, "", staff.id);
+    const o = await makeOrder(customer.id, p, { paymentMethod: "online" });
+    await recordPayment(o.id, "UPI-1", staff.id);
     await expect(updateOrderStatus(o.id, "cancelled", staff.id)).rejects.toThrow(/why/);
     await updateOrderStatus(o.id, "cancelled", staff.id, { cancelReason: "Customer changed mind" });
     let full = await getOrder(o.id);
@@ -60,6 +61,8 @@ describe("shipments", () => {
     const customer = await makeUser("customer");
     const other = await makeOrder(customer.id, await makeProduct());
     const o = await makeOrder(customer.id, await makeProduct());
+    await updateOrderStatus(o.id, "confirmed", staff.id);
+    await updateOrderStatus(o.id, "packed", staff.id);
     await expect(updateOrderStatus(o.id, "shipped", staff.id)).rejects.toThrow(/courier/);
     await updateOrderStatus(o.id, "shipped", staff.id, { shipment: ship });
 
@@ -70,6 +73,9 @@ describe("shipments", () => {
     expect((await getOrder(other.id))?.shipments).toHaveLength(0);
 
     // The same AWB can't be reused for another Blue Dart shipment.
+    await updateOrderStatus(other.id, "confirmed", staff.id);
+    await expect(updateOrderStatus(other.id, "shipped", staff.id, { shipment: ship })).rejects.toThrow(/can't move/);
+    await updateOrderStatus(other.id, "packed", staff.id);
     await expect(updateOrderStatus(other.id, "shipped", staff.id, { shipment: ship })).rejects.toThrow(/already used/);
 
     const s = full!.shipments[0];

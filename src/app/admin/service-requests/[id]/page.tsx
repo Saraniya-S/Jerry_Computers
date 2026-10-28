@@ -5,14 +5,15 @@ import { ArrowLeft, MapPin, Navigation, Phone, Store } from "lucide-react";
 import { Suspense } from "react";
 import { PageHeader, PageSkeleton } from "@/components/account/PageHeader";
 import { PriorityBadge, ServiceStatusBadge } from "@/components/admin/ServiceBadges";
-import { AssignmentOverride, NoteForm, StatusChanger } from "@/components/admin/ServiceJobActions";
+import { AssignmentOverride, NoteForm, ScheduleSetter, StatusChanger } from "@/components/admin/ServiceJobActions";
 import { TransferDecision } from "@/components/admin/TransferDecision";
 import { Badge, fullDateTimeFmt } from "@/components/admin/ui";
 import { FormAlert } from "@/components/auth/ui";
 import { engineerWorkloads } from "@/lib/server/admin/assignment";
 import { getServiceRequest, listTransfers } from "@/lib/server/admin/service-requests";
 import { requirePermission } from "@/lib/server/permissions";
-import { deviceTypeLabel, serviceFlow, serviceNumber, serviceStatusLabel } from "@/lib/service-desk";
+import { deviceTypeLabel, isActiveStatus, noteKindLabel, serviceFlow, serviceNumber, serviceStatusLabel } from "@/lib/service-desk";
+import { locationLinks } from "@/lib/service-location";
 
 export const metadata: Metadata = { title: "Service request" };
 
@@ -35,7 +36,7 @@ async function ServiceRequest({ params, searchParams }: Pick<PageProps<"/admin/s
   const [engineers, transfers] = await Promise.all([engineerWorkloads(undefined, { deviceType: job.deviceType, location: job.location }), listTransfers({ requestId: job.id })]);
   const ticket = serviceNumber(job.seq);
   const a = job.serviceAddress;
-  const destination = a ? encodeURIComponent([a.line1, a.line2, a.landmark, a.city, a.state, a.postalCode].filter(Boolean).join(", ")) : "";
+  const links = job.location === "on_site" ? locationLinks(a) : null;
   const closed = job.status === "completed" || job.status === "cancelled";
 
   return (
@@ -73,6 +74,8 @@ async function ServiceRequest({ params, searchParams }: Pick<PageProps<"/admin/s
                   ["Serial number", job.serialNumber ?? "—"],
                   ["Left with the device", job.accessories ?? "—"],
                   ["Came in by", job.source === "walk_in" ? "Walk-in" : job.source === "phone" ? "Phone" : "Online booking"],
+                  ["Scheduled", job.scheduledAt ? fullDateTimeFmt.format(job.scheduledAt) : "Not scheduled"],
+                  ["Accepted by engineer", job.acceptedAt ? fullDateTimeFmt.format(job.acceptedAt) : job.assignedEngineerId ? "Not yet" : "—"],
                 ] as const
               ).map(([k, v]) => (
                 <div key={k}>
@@ -96,9 +99,13 @@ async function ServiceRequest({ params, searchParams }: Pick<PageProps<"/admin/s
                 <li key={e.id} className="relative">
                   <span className="absolute -left-[1.3rem] top-1.5 size-2 rounded-full bg-brand" aria-hidden />
                   <p className="text-fg">
-                    {e.toStatus && e.fromStatus !== e.toStatus ? <span className="font-medium">{serviceStatusLabel[e.toStatus]}</span> : null}
-                    {e.toStatus && e.fromStatus !== e.toStatus && e.note ? " · " : null}
-                    {e.note}
+                    {e.toStatus && e.fromStatus !== e.toStatus ? (
+                      <span className="font-medium">{serviceStatusLabel[e.toStatus]}</span>
+                    ) : e.kind !== "note" ? (
+                      <span className="font-medium">{noteKindLabel[e.kind]}</span>
+                    ) : null}
+                    {((e.toStatus && e.fromStatus !== e.toStatus) || e.kind !== "note") && e.note ? " · " : null}
+                    <span className="whitespace-pre-line">{e.note}</span>
                   </p>
                   <p className="text-xs text-fg-dim">
                     {fullDateTimeFmt.format(e.createdAt)} · {by?.trim() || "System"}
@@ -165,7 +172,15 @@ async function ServiceRequest({ params, searchParams }: Pick<PageProps<"/admin/s
           <section className="rounded-xl border border-line p-4">
             <h2 className="mb-3 text-sm font-medium text-fg">Status</h2>
             <StatusChanger requestId={job.id} next={serviceFlow[job.status]} />
+            {job.status === "unable_to_complete" && <p className="mt-3 text-xs text-amber-800">The engineer handed this back. Reassign it below, or cancel it.</p>}
           </section>
+
+          {(isActiveStatus(job.status) || job.status === "open") && (
+            <section className="rounded-xl border border-line p-4">
+              <h2 className="mb-3 text-sm font-medium text-fg">Schedule</h2>
+              <ScheduleSetter requestId={job.id} current={job.scheduledAt} />
+            </section>
+          )}
 
           <section className="grid gap-3 rounded-xl border border-line p-4 text-sm">
             <h2 className="font-medium text-fg">Engineer</h2>
@@ -213,22 +228,24 @@ async function ServiceRequest({ params, searchParams }: Pick<PageProps<"/admin/s
                   <br />
                   {a.landmark && (
                     <>
-                      Near {a.landmark}
+                      Near {a.landmark.replace(/^near\s+/i, "")}
                       <br />
                     </>
                   )}
                   {a.city}, {a.state} {a.postalCode}
                 </address>
-                <div className="mt-2 flex flex-wrap gap-3">
-                  {a.mapsUrl && (
-                    <a href={a.mapsUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-brand hover:underline">
-                      <MapPin className="size-3.5" aria-hidden /> Shared location
+                {links ? (
+                  <div className="mt-2 flex flex-wrap gap-3">
+                    <a href={links.view} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-brand hover:underline">
+                      <MapPin className="size-3.5" aria-hidden /> {links.source === "pin" ? "Saved pin" : links.source === "shared_link" ? "Shared location" : "Open in maps"}
                     </a>
-                  )}
-                  <a href={`https://www.google.com/maps/dir/?api=1&destination=${destination}`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-brand hover:underline">
-                    <Navigation className="size-3.5" aria-hidden /> Directions
-                  </a>
-                </div>
+                    <a href={links.directions} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-brand hover:underline">
+                      <Navigation className="size-3.5" aria-hidden /> Directions
+                    </a>
+                  </div>
+                ) : (
+                  <p className="mt-2 text-xs text-amber-800">No usable location saved; the engineer will need to call for directions.</p>
+                )}
               </>
             ) : (
               <p className="text-fg-muted">The device is at the shop.</p>

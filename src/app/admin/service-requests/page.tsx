@@ -17,6 +17,7 @@ export const metadata: Metadata = { title: "Service requests" };
 const views = [
   ["active", "Active"],
   ["open", "Unassigned"],
+  ["unable_to_complete", "Handed back"],
   ["closed", "Completed & cancelled"],
   ["", "All"],
 ] as const;
@@ -76,7 +77,7 @@ async function ServiceRequests({ searchParams }: Pick<PageProps<"/admin/service-
         })}
       </nav>
       <FilterBar resetHref="/admin/service-requests">
-        {status && !["active", "open", "closed"].includes(status) ? (
+        {status && !["active", "open", "closed", "unable_to_complete"].includes(status) ? (
           <FilterSelect name="status" value={status} label="Status" all="Any status" options={serviceStatuses.map((s) => ({ value: s, label: serviceStatusLabel[s] }))} />
         ) : (
           status && <input type="hidden" name="status" value={status} />
