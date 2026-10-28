@@ -39,7 +39,9 @@ const reasons: Reason[] = [
   },
 ];
 
-export function WhyChooseUsSection() {
+/** `copy` overrides each reason's title and body from Admin → Homepage; tags, chips and visuals stay as designed. */
+export function WhyChooseUsSection({ copy }: { copy?: { title: string; body: string }[] }) {
+  const items = reasons.map((r, i) => ({ ...r, ...(copy?.[i] ?? {}) }));
   const rich = useRichMotion();
   const listRef = useRef<HTMLOListElement>(null);
   const { scrollYProgress } = useScroll({ target: listRef, offset: ["start start", "end end"] });
@@ -53,8 +55,8 @@ export function WhyChooseUsSection() {
         </h2>
 
         <ol ref={listRef} className="mt-14 space-y-6 sm:mt-20 md:space-y-0">
-          {reasons.map((reason, i) => (
-            <StackCard key={reason.tag} reason={reason} index={i} total={reasons.length} progress={scrollYProgress} rich={rich} />
+          {items.map((reason, i) => (
+            <StackCard key={reason.tag} reason={reason} index={i} total={items.length} progress={scrollYProgress} rich={rich} />
           ))}
         </ol>
 

@@ -17,13 +17,14 @@ export default function LoginPage({ searchParams }: PageProps<"/login">) {
 
 async function Login({ searchParams }: Pick<PageProps<"/login">, "searchParams">) {
   await redirectIfSignedIn();
-  const { next, error } = await searchParams;
+  const { next, error, notice } = await searchParams;
   return (
     <AuthForm
       mode="login"
       googleEnabled={googleEnabled}
       next={typeof next === "string" ? safeNext(next, "") || undefined : undefined}
       errorCode={typeof error === "string" ? error : undefined}
+      noticeCode={typeof notice === "string" ? notice : undefined}
     />
   );
 }

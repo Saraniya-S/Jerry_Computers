@@ -1,22 +1,22 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { Check } from "lucide-react";
-import { getService, services } from "@/data/services";
+import { getServiceBySlug, getServices } from "@/lib/server/services";
 import { PlaceholderPage } from "@/components/layout/PlaceholderPage";
 import { ButtonLink } from "@/components/ui/Button";
 
-export function generateStaticParams() {
-  return services.map((s) => ({ slug: s.slug }));
+export async function generateStaticParams() {
+  return (await getServices()).map((s) => ({ slug: s.slug }));
 }
 
 export async function generateMetadata({ params }: PageProps<"/services/[slug]">): Promise<Metadata> {
   const { slug } = await params;
-  return { title: getService(slug)?.title ?? "Service" };
+  return { title: (await getServiceBySlug(slug))?.title ?? "Service" };
 }
 
 export default async function ServicePage({ params }: PageProps<"/services/[slug]">) {
   const { slug } = await params;
-  const service = getService(slug);
+  const service = await getServiceBySlug(slug);
   if (!service) notFound();
 
   return (

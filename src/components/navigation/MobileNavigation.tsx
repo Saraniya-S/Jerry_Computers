@@ -8,6 +8,7 @@ import { createPortal } from "react-dom";
 import { navLinks } from "@/config/site";
 import { ButtonLink } from "@/components/ui/Button";
 import { Logo } from "@/components/ui/Logo";
+import { useSession } from "@/lib/client/session";
 
 type Props = { open: boolean; onOpenChange: (open: boolean) => void; active: string | null };
 
@@ -17,6 +18,7 @@ export function MobileNavigation({ open, onOpenChange, active }: Props) {
   const reduce = useReducedMotion();
   const panelRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
+  const { viewer } = useSession();
   const mounted = useSyncExternalStore(noopSubscribe, () => true, () => false);
 
   useEffect(() => {
@@ -112,9 +114,15 @@ export function MobileNavigation({ open, onOpenChange, active }: Props) {
                   <ButtonLink href="/services/request" variant="brand" size="lg" onClick={close}>
                     Book a Service <ArrowUpRight className="size-4" aria-hidden />
                   </ButtonLink>
-                  <ButtonLink href="/login" variant="outline" size="lg" onClick={close}>
-                    <UserRound className="size-4" aria-hidden /> Login
-                  </ButtonLink>
+                  {viewer ? (
+                    <ButtonLink href={viewer.home} variant="outline" size="lg" onClick={close}>
+                      <UserRound className="size-4" aria-hidden /> {viewer.role === "customer" ? "My account" : "My workspace"}
+                    </ButtonLink>
+                  ) : (
+                    <ButtonLink href="/login" variant="outline" size="lg" onClick={close}>
+                      <UserRound className="size-4" aria-hidden /> Login
+                    </ButtonLink>
+                  )}
                 </div>
               </motion.div>
             )}

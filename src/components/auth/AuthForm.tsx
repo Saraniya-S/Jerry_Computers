@@ -31,6 +31,7 @@ const queryErrors: Record<string, string> = {
   google_failed: "Google sign-in didn't complete. Please try again.",
   google_unverified: "That Google account's email isn't verified with Google.",
   google_staff: "Staff, engineer and admin accounts sign in with email and password.",
+  account_disabled: "This account has been switched off. Contact the shop if you think that's a mistake.",
 };
 
 type Props = {
@@ -40,15 +41,21 @@ type Props = {
   next?: string;
   /** An error code from the URL, e.g. after a failed Google sign-in. */
   errorCode?: string;
+  /** A notice code from the URL, e.g. after setting a password. */
+  noticeCode?: string;
+};
+
+const notices: Record<string, string> = {
+  welcome: "Your password is set. Sign in to get started.",
+  reset: "Your password has been changed. Sign in with the new one.",
 };
 
 /** Sign-in / sign-up form. Both steps end on the emailed one-time code screen. */
-export function AuthForm({ mode, googleEnabled, next, errorCode }: Props) {
+export function AuthForm({ mode, googleEnabled, next, errorCode, noticeCode }: Props) {
   const reduce = useReducedMotion();
   const [state, action] = useActionState<FormState, FormData>(mode === "login" ? login : register, {});
   const [showPassword, setShowPassword] = useState(false);
   const [password, setPassword] = useState("");
-  const [forgotNote, setForgotNote] = useState(false);
   const t = copy[mode];
   const v = state.values ?? {};
   const fe = state.fieldErrors ?? {};
@@ -86,6 +93,7 @@ export function AuthForm({ mode, googleEnabled, next, errorCode }: Props) {
       <motion.form variants={item} action={action} noValidate className="grid gap-3">
         {next && <input type="hidden" name="next" value={next} />}
         {topError && <FormAlert>{topError}</FormAlert>}
+        {!topError && noticeCode && notices[noticeCode] && <FormAlert tone="success">{notices[noticeCode]}</FormAlert>}
 
         {mode === "register" && (
           <div className="grid gap-3 sm:grid-cols-2">
@@ -156,13 +164,10 @@ export function AuthForm({ mode, googleEnabled, next, errorCode }: Props) {
               <input type="checkbox" name="remember" defaultChecked className="size-4 shrink-0 accent-brand" />
               Keep me signed in
             </label>
-            <button type="button" onClick={() => setForgotNote(true)} className="font-medium text-brand hover:underline hover:underline-offset-4">
+            <Link href="/forgot-password" className="font-medium text-brand hover:underline hover:underline-offset-4">
               Forgot password?
-            </button>
+            </Link>
           </div>
-        )}
-        {forgotNote && (
-          <FormAlert tone="info">Password reset isn&apos;t available yet. Contact the shop and we&apos;ll help you get back in.</FormAlert>
         )}
 
         <SubmitButton pendingLabel={t.pending}>{t.submit}</SubmitButton>

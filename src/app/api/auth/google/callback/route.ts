@@ -41,6 +41,7 @@ export async function GET(request: NextRequest) {
     .where(or(eq(schema.users.googleSub, profile.sub), eq(schema.users.email, profile.email)))
     .limit(1);
   if (existing && existing.role !== "customer") return fail("google_staff");
+  if (existing?.disabledAt) return fail("account_disabled");
 
   const now = new Date();
   const [user] = existing
@@ -71,7 +72,9 @@ export async function GET(request: NextRequest) {
 
   await createSession(user.id);
   const next = safeNext(saved.next, "/account");
-  const res = NextResponse.redirect(new URL(next.startsWith("/account") ? next : "/account", request.url));
+  // New Google sign-ups go through the welcome steps first.
+  const dest = !user.onboardedAt && !existing ? "/onboarding" : next.startsWith("/account") ? next : "/account";
+  const res = NextResponse.redirect(new URL(dest, request.url));
   res.cookies.delete({ name: GOOGLE_STATE_COOKIE, path: "/api/auth/google" });
   return res;
 }

@@ -1,8 +1,8 @@
-import Image from "next/image";
 import Link from "next/link";
 import { ArrowUpRight } from "lucide-react";
-import { formatPrice, getCategory, type Product } from "@/data/products";
-import { ProductArt } from "./ProductArt";
+import { getCategory, type Product } from "@/data/products";
+import { PriceTag } from "./PriceTag";
+import { ProductImage } from "./ProductImage";
 
 type ProductCardProps = {
   product: Product;
@@ -16,17 +16,13 @@ export function ProductCard({ product, interactive = true, className = "" }: Pro
   const body = (
     <>
       <div className="relative aspect-[4/3] overflow-hidden rounded-xl bg-[radial-gradient(80%_80%_at_50%_30%,var(--art-a),var(--art-b))]">
-        {product.image ? (
-          <Image src={product.image} alt={product.name} fill sizes="220px" className="object-contain p-3" />
-        ) : (
-          <ProductArt category={product.category} variant={product.variant} className="absolute inset-0 size-full p-2" />
-        )}
+        <ProductImage product={product} padding="p-2" />
       </div>
       <div className="flex flex-1 flex-col px-1.5 pb-1 pt-3">
         <p className="font-mono text-[0.6rem] uppercase tracking-[0.16em] text-fg-dim">{category.label}</p>
         <p className="mt-1 text-[0.95rem] font-medium leading-snug tracking-tight text-fg">{product.name}</p>
         <div className="mt-auto flex items-center justify-between pt-2.5">
-          <span className="text-[0.78rem] text-fg-muted">{formatPrice(product.price)}</span>
+          <PriceTag product={product} />
           <ArrowUpRight className="size-4 text-fg-muted transition-colors group-hover:text-brand" aria-hidden />
         </div>
       </div>

@@ -3,10 +3,10 @@
 import Link from "next/link";
 import { Search } from "lucide-react";
 import { useId, useMemo, useRef, useState } from "react";
-import { getCategory, products } from "@/data/products";
+import { getCategory, type Product } from "@/data/products";
 
 /** Sidebar search over the product catalogue, with results in a dropdown. */
-export function ProductSearch() {
+export function ProductSearch({ products }: { products: Pick<Product, "slug" | "name" | "category">[] }) {
   const [q, setQ] = useState("");
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(0);
@@ -19,7 +19,7 @@ export function ProductSearch() {
     return products
       .filter((p) => `${p.name} ${getCategory(p.category).label}`.toLowerCase().includes(term))
       .slice(0, 6);
-  }, [q]);
+  }, [q, products]);
 
   const show = open && q.trim().length > 0;
 

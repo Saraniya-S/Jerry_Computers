@@ -13,7 +13,7 @@ export function ServiceCard({ service, compact = false }: { service: Service; co
       </p>
       <div className={`flex items-center ${compact ? "mt-3 h-[88px]" : "mt-4 h-[104px]"} overflow-hidden rounded-xl border border-line bg-[var(--inset)] px-3.5`}>
         <div className="w-full">
-          <ServiceVisual id={service.id} />
+          <ServiceVisual id={service.visual} />
         </div>
       </div>
       <h3 className={`${compact ? "mt-3.5" : "mt-5"} text-[1.05rem] font-medium leading-snug tracking-tight text-fg`}>{service.title}</h3>

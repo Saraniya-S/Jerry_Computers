@@ -10,7 +10,10 @@
     "services:up": "docker compose up -d",
     "db:generate": "node --env-file=.env.local node_modules/drizzle-kit/bin.cjs generate",
     "db:migrate": "node --env-file=.env.local node_modules/drizzle-kit/bin.cjs migrate",
-    "db:studio": "node --env-file=.env.local node_modules/drizzle-kit/bin.cjs studio"
+    "db:studio": "node --env-file=.env.local node_modules/drizzle-kit/bin.cjs studio",
+    "admin:create": "node --env-file=.env.local scripts/create-super-admin.mjs",
+    "test": "vitest run",
+    "test:db:migrate": "DATABASE_URL=${TEST_DATABASE_URL:-postgres://jerry:jerry@localhost:5433/jerry_computers_test} node node_modules/drizzle-kit/bin.cjs migrate"
   },
   "dependencies": {
     "drizzle-orm": "^0.45.4",
@@ -18,6 +21,7 @@
     "motion": "^14.6.0",
     "next": "16.4.3",
     "nodemailer": "^10.2.1",
+    "pdf-lib": "^1.17.1",
     "postgres": "^3.4.9",
     "react": "19.3.0",
     "react-dom": "19.3.0",
@@ -34,6 +38,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.4.3",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^3.2.4"
   }
 }

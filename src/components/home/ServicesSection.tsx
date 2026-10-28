@@ -11,7 +11,7 @@ import {
 } from "motion/react";
 import { ArrowUpRight } from "lucide-react";
 import { useEffect, useRef, useState, type RefObject } from "react";
-import { services, type Service } from "@/data/services";
+import type { Service } from "@/data/services";
 import { ServiceCard } from "@/components/services/ServiceCard";
 import { ButtonLink } from "@/components/ui/Button";
 import { Accent, Eyebrow } from "@/components/ui/SectionHeading";
@@ -28,7 +28,7 @@ type Stage = { w: number; h: number; visible: boolean };
 const smooth = (t: number) => t * t * (3 - 2 * t);
 const clamp01 = (t: number) => Math.min(1, Math.max(0, t));
 
-export function ServicesSection() {
+export function ServicesSection({ services }: { services: Service[] }) {
   const rich = useRichMotion(1024, 600);
   const ref = useRef<HTMLDivElement>(null);
   const stageRef = useRef<HTMLUListElement>(null);

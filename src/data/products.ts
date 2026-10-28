@@ -24,19 +24,41 @@ export type ProductCategory = {
   blurb: string;
 };
 
+/** What a product is typically bought for; used by the catalogue's "Good for" filter. */
+export type ProductUse = "home" | "office" | "creative" | "security";
+
+export const productUses: { id: ProductUse; label: string }[] = [
+  { id: "home", label: "Home & study" },
+  { id: "office", label: "Office & business" },
+  { id: "creative", label: "Gaming & creative" },
+  { id: "security", label: "Security" },
+];
+
+/** A product as shown in the store. Stored in the database and edited in the admin area. */
 export type Product = {
+  id: string;
   slug: string;
   name: string;
+  brand: string | null;
   category: ProductCategoryId;
   summary: string;
-  /** Price in the store currency. `null` means price on enquiry. */
-  price: number | null;
-  /** Optional photo path under /public. Falls back to category artwork. */
-  image?: string;
-  /** Artwork variant (0–2) used when no photo is supplied. */
+  description: string;
+  uses: ProductUse[];
+  specs: { label: string; value: string }[];
+  /** Uploaded image URLs; the first is the main image. */
+  images: string[];
+  /** Artwork variant (0–2) used when there is no image. */
   variant: 0 | 1 | 2;
-  isDemo: true;
+  /** Price including GST, in paise. Null means it can't be bought online yet. */
+  pricePaise: number | null;
+  mrpPaise: number | null;
+  gstRateBp: number;
+  stock: number;
+  isFeatured: boolean;
 };
+
+/** Can be added to the cart: priced and in stock. */
+export const canBuy = (p: Pick<Product, "pricePaise" | "stock">) => p.pricePaise !== null && p.stock > 0;
 
 export const productCategories: ProductCategory[] = [
   { id: "laptops", label: "Laptops", blurb: "Everyday, business and performance notebooks." },
@@ -48,51 +70,20 @@ export const productCategories: ProductCategory[] = [
   { id: "accessories", label: "Accessories", blurb: "Keyboards, mice, cables and peripherals." },
 ];
 
-const demo = (
-  slug: string,
-  name: string,
-  category: ProductCategoryId,
-  summary: string,
-  variant: 0 | 1 | 2,
-): Product => ({ slug, name, category, summary, variant, price: null, isDemo: true });
-
-export const products: Product[] = [
-  demo("ultrabook-14", "Ultrabook 14", "laptops", "Thin, light notebook for work and study.", 0),
-  demo("creator-16", "Creator 16", "laptops", "Large-screen laptop for creative workloads.", 1),
-  demo("business-15", "Business 15", "laptops", "Durable notebook for the office.", 2),
-  demo("tower-performance", "Performance Tower", "desktops", "Custom-configured gaming and creator build.", 0),
-  demo("compact-office", "Compact Office PC", "desktops", "Small-form desktop for daily tasks.", 1),
-  demo("workstation-pro", "Workstation Build", "desktops", "Multi-core build for heavy workloads.", 2),
-  demo("graphics-card", "Graphics Card", "components", "Discrete GPU for gaming and rendering.", 0),
-  demo("ddr5-memory", "DDR5 Memory Kit", "components", "Dual-channel desktop memory.", 1),
-  demo("nvme-ssd", "NVMe SSD", "components", "Fast M.2 solid-state storage.", 2),
-  demo("dome-camera", "Dome Camera", "cctv", "Indoor dome camera for shops and offices.", 0),
-  demo("bullet-camera", "Bullet Camera", "cctv", "Weather-rated outdoor camera.", 1),
-  demo("nvr-kit", "NVR Recorder Kit", "cctv", "Network recorder with camera set.", 2),
-  demo("laser-printer", "Laser Printer", "printers", "Monochrome laser for high volume.", 0),
-  demo("ink-tank", "Ink Tank Printer", "printers", "Low running-cost colour printing.", 1),
-  demo("mfp-office", "Office Multifunction", "printers", "Print, scan and copy in one unit.", 2),
-  demo("ups-desktop", "Desktop UPS", "ups", "Backup power for a single workstation.", 0),
-  demo("ups-online", "Online UPS", "ups", "Continuous power for sensitive equipment.", 1),
-  demo("ups-rack", "Rack-mount UPS", "ups", "Protection for network and server racks.", 2),
-  demo("mech-keyboard", "Mechanical Keyboard", "accessories", "Tactile keyboard for long sessions.", 0),
-  demo("wireless-mouse", "Wireless Mouse", "accessories", "Ergonomic, low-latency mouse.", 1),
-  demo("usb-c-hub", "USB-C Hub", "accessories", "Expand ports for modern laptops.", 2),
-];
-
-export function getFeaturedProducts(): Product[] {
-  return products;
-}
-
-export function getProduct(slug: string): Product | undefined {
-  return products.find((p) => p.slug === slug);
-}
-
 export function getCategory(id: ProductCategoryId): ProductCategory {
   return productCategories.find((c) => c.id === id)!;
 }
 
-export function formatPrice(price: number | null) {
-  if (price === null) return "Price on enquiry";
-  return new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(price);
+const inr = new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 });
+
+/** Shop price in whole rupees, e.g. ₹54,990. */
+export function formatPrice(pricePaise: number | null) {
+  if (pricePaise === null) return "Price on enquiry";
+  return inr.format(Math.round(pricePaise / 100));
+}
+
+/** Whole-percent discount from MRP, or null. */
+export function discountPercent(p: Pick<Product, "pricePaise" | "mrpPaise">) {
+  if (p.pricePaise === null || !p.mrpPaise || p.mrpPaise <= p.pricePaise) return null;
+  return Math.round((1 - p.pricePaise / p.mrpPaise) * 100);
 }

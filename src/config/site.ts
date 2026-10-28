@@ -1,30 +1,11 @@
 /**
- * Business details for Jerry Computers.
- *
- * Every field set to `null` is information we have not been given yet.
- * Fill these in with verified details and the homepage, contact section
- * and footer will pick them up automatically. Do not add guesses here.
+ * Fixed site identity. Contact details, opening hours, social links and the GSTIN are edited in
+ * Admin → Shop settings and read with getSettings("shop").
  */
-export type SocialLink = { label: string; href: string };
-
-export type BusinessHours = { days: string; hours: string };
-
 export type SiteConfig = {
   name: string;
   shortName: string;
   description: string;
-  contact: {
-    /** Full street address, shown as written. */
-    address: string | null;
-    /** A Google Maps (or similar) link for the verified address. */
-    mapUrl: string | null;
-    /** Display format, e.g. "+91 98765 43210". */
-    phone: string | null;
-    email: string | null;
-    serviceEmail: string | null;
-    hours: BusinessHours[] | null;
-  };
-  social: SocialLink[];
 };
 
 export const site: SiteConfig = {
@@ -32,15 +13,6 @@ export const site: SiteConfig = {
   shortName: "Jerry",
   description:
     "Laptops, desktops, custom PC builds, components, CCTV, printers and UPS — with repair, installation and technical support from the same team.",
-  contact: {
-    address: null,
-    mapUrl: null,
-    phone: null,
-    email: null,
-    serviceEmail: null,
-    hours: null,
-  },
-  social: [],
 };
 
 export type NavLink = { label: string; href: string; section: string };

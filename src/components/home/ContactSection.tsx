@@ -1,14 +1,18 @@
 import Link from "next/link";
 import { ArrowUpRight, Clock, Mail, MapPin, MessageSquare, Phone, Wrench, type LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
-import { site, telHref } from "@/config/site";
-import { Accent, Eyebrow } from "@/components/ui/SectionHeading";
+import { telHref } from "@/config/site";
+import { Accented } from "@/components/ui/Accented";
+import { getSettings } from "@/lib/server/settings";
+import { shopContact } from "@/lib/settings";
+import { Eyebrow } from "@/components/ui/SectionHeading";
 import { Reveal } from "@/components/ui/Reveal";
 
 const pending = <span className="text-fg-dim">To be confirmed</span>;
 
-export function ContactSection() {
-  const c = site.contact;
+export async function ContactSection() {
+  const [shop, home] = await Promise.all([getSettings("shop"), getSettings("home")]);
+  const c = shopContact(shop);
   const generalHref = c.email ? `mailto:${c.email}` : c.phone ? telHref(c.phone) : null;
   const serviceHref = "/services/request";
 
@@ -19,10 +23,10 @@ export function ContactSection() {
         <Reveal>
           <Eyebrow>Contact</Eyebrow>
           <h2 id="contact-title" className="mt-5 max-w-xl text-balance text-4xl font-medium leading-[1.02] tracking-[-0.035em] text-fg sm:text-6xl">
-            Let&apos;s get your tech <Accent>sorted.</Accent>
+            <Accented text={home.contactTitle} />
           </h2>
           <p className="mt-5 max-w-md text-pretty text-base leading-relaxed text-fg-muted sm:text-lg">
-            Questions about a product, or something that needs fixing? Reach the right team below.
+            {home.contactBody}
           </p>
 
           <div className="mt-10 grid gap-3 sm:grid-cols-2">
@@ -66,7 +70,7 @@ export function ContactSection() {
               )}
             </Detail>
             <Detail icon={Clock} label="Business hours">
-              {c.hours ? (
+              {c.hours.length ? (
                 <ul className="space-y-1">
                   {c.hours.map((h) => (
                     <li key={h.days} className="flex justify-between gap-6">

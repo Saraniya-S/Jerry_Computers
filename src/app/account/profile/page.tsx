@@ -1,10 +1,15 @@
 import type { Metadata } from "next";
-import { BadgeCheck, LogOut } from "lucide-react";
+import Link from "next/link";
+import { BadgeCheck, ChevronRight, LogOut, MapPin } from "lucide-react";
 import { Suspense } from "react";
 import { PageHeader, PageSkeleton } from "@/components/account/PageHeader";
+import { PreferencesForm } from "@/components/account/PreferencesForm";
 import { ProfileForm } from "@/components/account/ProfileForm";
 import { GoogleIcon } from "@/components/auth/ui";
+import type { ProductCategoryId } from "@/data/products";
+import { mobileInputValue } from "@/lib/customer";
 import { requireCustomer } from "@/lib/server/auth";
+import { listAddresses } from "@/lib/server/customer";
 import { signOutEverywhere } from "../actions";
 
 export const metadata: Metadata = { title: "Profile & security" };
@@ -21,12 +26,46 @@ export default function ProfilePage() {
 
 async function Profile() {
   const viewer = await requireCustomer();
+  const addresses = await listAddresses(viewer.id);
+  const primary = addresses.find((a) => a.isDefault);
   return (
     <>
       <PageHeader title="Profile & security" description="Your contact details and how you sign in." />
       <div className="grid gap-8 p-5 sm:p-7 lg:grid-cols-[220px_1fr] lg:gap-10">
-        <SectionIntro title="Personal details" text="Used on orders, invoices and service tickets." />
-        <ProfileForm firstName={viewer.firstName} lastName={viewer.lastName} phone={viewer.phone ?? ""} />
+        <SectionIntro title="Contact details" text="Used on orders, invoices and service tickets." />
+        <ProfileForm firstName={viewer.firstName} lastName={viewer.lastName} phone={mobileInputValue(viewer.phone)} />
+
+        <hr className="border-line lg:col-span-2" />
+
+        <SectionIntro title="Addresses" text="Delivery and on-site service locations." />
+        <Link
+          href="/account/addresses"
+          className="group flex max-w-xl items-center gap-3 rounded-xl border border-line bg-ink-950 px-4 py-3.5 transition-colors hover:border-brand/30"
+        >
+          <MapPin className="size-5 shrink-0 text-brand" aria-hidden />
+          <span className="min-w-0 flex-1">
+            <span className="block text-sm font-medium text-fg">
+              {addresses.length} saved {addresses.length === 1 ? "address" : "addresses"}
+            </span>
+            <span className="block truncate text-xs text-fg-dim">
+              {primary ? `Default: ${primary.line1}, ${primary.city} ${primary.postalCode}` : "Add where we should deliver and visit."}
+            </span>
+          </span>
+          <ChevronRight className="size-4 text-fg-dim transition-transform group-hover:translate-x-0.5" aria-hidden />
+        </Link>
+
+        <hr className="border-line lg:col-span-2" />
+
+        <SectionIntro title="Preferences" text="Invoice type, interests and how we keep you updated." />
+        <PreferencesForm
+          initial={{
+            customerType: viewer.customerType,
+            companyName: viewer.companyName ?? "",
+            gstin: viewer.gstin ?? "",
+            whatsappUpdates: viewer.whatsappUpdates,
+            interests: viewer.interests as ProductCategoryId[],
+          }}
+        />
 
         <hr className="border-line lg:col-span-2" />
 

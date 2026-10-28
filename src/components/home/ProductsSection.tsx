@@ -1,5 +1,6 @@
 import { ArrowUpRight } from "lucide-react";
-import { getFeaturedProducts, productCategories, type ProductCategoryId } from "@/data/products";
+import { productCategories, type ProductCategoryId } from "@/data/products";
+import { getCatalogue } from "@/lib/server/catalogue";
 import { ElasticReel, type ReelItem } from "@/components/products/reel/ElasticReel";
 import { ButtonLink } from "@/components/ui/Button";
 import { Accent, Eyebrow } from "@/components/ui/SectionHeading";
@@ -14,8 +15,8 @@ const tints: Record<ProductCategoryId, string> = {
   accessories: "linear-gradient(180deg,#f0ebf6,#ddd3eb)",
 };
 
-export function ProductsSection() {
-  const products = getFeaturedProducts();
+export async function ProductsSection() {
+  const products = await getCatalogue();
   const categories: ReelItem[] = productCategories.map((c) => {
     const count = products.filter((p) => p.category === c.id).length;
     return {
@@ -23,7 +24,7 @@ export function ProductsSection() {
       title: c.label,
       eyebrow: `${count} ${count === 1 ? "product" : "products"}`,
       description: c.blurb,
-      href: `/products#${c.id}`,
+      href: `/products?category=${c.id}`,
       cta: `Browse ${c.label}`,
       art: { category: c.id, variant: 0 },
       tint: tints[c.id],

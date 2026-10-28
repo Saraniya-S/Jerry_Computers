@@ -1,18 +1,20 @@
 import { ArrowRight, ArrowUpRight } from "lucide-react";
 import { ButtonLink } from "@/components/ui/Button";
-import { Accent } from "@/components/ui/SectionHeading";
+import { Accented } from "@/components/ui/Accented";
+import { getSettings } from "@/lib/server/settings";
 import { HeroIntro, HeroIntroItem } from "./hero/HeroIntro";
 import { heroTiles } from "@/data/heroTiles";
 import { TiltedTiles } from "./hero/TiltedTiles";
 
-const pillars = ["Sales", "Repairs", "Installation", "Support"];
-
-export function HeroSection() {
+export async function HeroSection() {
+  const home = await getSettings("home");
+  // Uploaded photos lead; the built-in set fills the wall when there are only a few.
+  const tiles = home.heroImages.length ? [...home.heroImages, ...heroTiles].slice(0, Math.max(heroTiles.length, home.heroImages.length)) : heroTiles;
   return (
     <section id="home" aria-labelledby="hero-title" className="relative isolate flex min-h-[100svh] flex-col overflow-hidden bg-ink-950 lg:min-h-[max(92svh,680px)]">
       {/* Tilted wall of product photos scrolling past */}
       <div className="absolute inset-0 -z-20">
-        <TiltedTiles images={heroTiles} heroId="home" />
+        <TiltedTiles images={tiles} heroId="home" />
       </div>
 
       {/* Contrast layers for the text column */}
@@ -26,18 +28,18 @@ export function HeroSection() {
         <HeroIntro className="max-w-xl lg:max-w-[min(45vw,600px)]">
           <HeroIntroItem>
             <p className="inline-flex items-center gap-2 rounded-full border border-line bg-ink-900/60 py-1 pl-1.5 pr-3 font-mono text-[0.7rem] uppercase tracking-[0.14em] text-fg-muted backdrop-blur">
-              <span className="rounded-full bg-brand/15 px-2 py-0.5 text-brand">New</span>
-              Hardware &amp; service, one counter
+              <span className="rounded-full bg-brand/15 px-2 py-0.5 text-brand">{home.heroBadge}</span>
+              {home.heroEyebrow}
             </p>
           </HeroIntroItem>
           <HeroIntroItem>
             <h1 id="hero-title" className="mt-7 text-balance text-[3.1rem] font-medium leading-[0.98] tracking-[-0.045em] text-fg sm:text-7xl lg:text-[5.4rem]">
-              Technology that <Accent>works</Accent> for you.
+              <Accented text={home.heroTitle} />
             </h1>
           </HeroIntroItem>
           <HeroIntroItem>
             <p className="mt-6 max-w-md text-pretty text-base leading-relaxed text-fg-muted sm:text-lg">
-              Premium computer hardware, expert repairs and reliable support — from laptops and custom PCs to CCTV, printers and UPS.
+              {home.heroSubtitle}
             </p>
           </HeroIntroItem>
         </HeroIntro>
@@ -53,7 +55,7 @@ export function HeroSection() {
           </HeroIntroItem>
           <HeroIntroItem>
             <ul className="flex flex-wrap gap-x-6 gap-y-2 font-mono text-[0.7rem] uppercase tracking-[0.16em]" aria-label="What we do">
-              {pillars.map((p, i) => (
+              {home.heroPillars.map((p, i) => (
                 <li key={p} className="flex items-center gap-2">
                   <span className="text-brand/80">0{i + 1}</span>
                   <span className="text-fg-muted">{p}</span>

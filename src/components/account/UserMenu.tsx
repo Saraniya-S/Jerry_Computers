@@ -7,7 +7,7 @@ import { useEffect, useRef, useState } from "react";
 import { logout } from "@/app/(auth)/actions";
 
 /** Account button pinned to the bottom of the sidebar; opens upward with profile and sign-out. */
-export function UserMenu({ name, email }: { name: string; email: string }) {
+export function UserMenu({ name, email, profileHref = "/account/profile", badge }: { name: string; email: string; profileHref?: string | null; badge?: string }) {
   const reduce = useReducedMotion();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -42,14 +42,16 @@ export function UserMenu({ name, email }: { name: string; email: string }) {
             exit={reduce ? { opacity: 0 } : { opacity: 0, y: 6, scale: 0.98 }}
             transition={{ duration: 0.16 }}
           >
+            {profileHref && (
             <Link
-              href="/account/profile"
+              href={profileHref}
               role="menuitem"
               onClick={() => setOpen(false)}
               className="flex h-9 items-center gap-2.5 rounded-lg px-2.5 text-sm text-fg hover:bg-ink-900"
             >
               <UserRound className="size-4 text-fg-dim" aria-hidden /> Profile &amp; security
             </Link>
+            )}
             <form action={logout}>
               <button type="submit" role="menuitem" className="flex h-9 w-full items-center gap-2.5 rounded-lg px-2.5 text-sm text-fg hover:bg-ink-900">
                 <LogOut className="size-4 text-fg-dim" aria-hidden /> Sign out
@@ -68,7 +70,7 @@ export function UserMenu({ name, email }: { name: string; email: string }) {
         <span className="grid size-8 shrink-0 place-items-center rounded-full bg-brand text-xs font-semibold text-white">{initials}</span>
         <span className="min-w-0 flex-1">
           <span className="block truncate text-sm font-medium text-fg">{name}</span>
-          <span className="block truncate text-xs text-fg-dim">{email}</span>
+          <span className="block truncate text-xs text-fg-dim">{badge ? `${badge} · ${email}` : email}</span>
         </span>
         <ChevronsUpDown className="size-4 shrink-0 text-fg-dim" aria-hidden />
       </button>

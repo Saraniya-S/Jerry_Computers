@@ -1,10 +1,11 @@
 import Link from "next/link";
-import { ArrowUpRight, BadgeCheck, CalendarDays, KeyRound, Package, ShoppingBag, Truck, Wrench } from "lucide-react";
+import { ArrowRight, ArrowUpRight, BadgeCheck, CalendarDays, KeyRound, MapPin, Package, ShoppingBag, Sparkles, Truck, Wrench } from "lucide-react";
 import { Suspense } from "react";
 import { outlineButton, primaryButton } from "@/components/account/buttons";
 import { EmptyState, PageHeader, PageSkeleton } from "@/components/account/PageHeader";
 import { productCategories } from "@/data/products";
 import { requireCustomer } from "@/lib/server/auth";
+import { listAddresses } from "@/lib/server/customer";
 
 export default function AccountOverviewPage() {
   return (
@@ -19,6 +20,7 @@ const dateFmt = new Intl.DateTimeFormat("en-IN", { day: "numeric", month: "short
 async function Overview() {
   const viewer = await requireCustomer();
   const methods = [viewer.hasPassword && "Email & password", viewer.hasGoogle && "Google"].filter(Boolean).join(" · ");
+  const primary = (await listAddresses(viewer.id)).find((a) => a.isDefault);
 
   return (
     <>
@@ -36,6 +38,21 @@ async function Overview() {
           </>
         }
       />
+
+      {!viewer.onboardedAt && (
+        <div className="mx-5 mt-5 flex flex-wrap items-center gap-4 rounded-xl border border-brand/20 bg-gradient-to-r from-mint-soft to-ink-850 px-4 py-3.5 sm:mx-7 sm:mt-7">
+          <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-ink-850 text-brand shadow-[0_1px_2px_var(--line)]">
+            <Sparkles className="size-4" aria-hidden />
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-medium text-fg">Finish setting up your account</p>
+            <p className="text-xs text-fg-muted">Add your mobile number and delivery address so orders and engineer visits go smoothly.</p>
+          </div>
+          <Link href="/onboarding" className={primaryButton}>
+            Continue setup <ArrowRight className="size-4" aria-hidden />
+          </Link>
+        </div>
+      )}
 
       <div className="grid gap-4 p-5 sm:p-7 lg:grid-cols-3">
         <QuickAction
@@ -88,18 +105,21 @@ async function Overview() {
               <Row icon={<KeyRound className="size-4 text-fg-dim" aria-hidden />} label="Sign-in">
                 <span className="text-fg">{methods}</span>
               </Row>
+              <Row icon={<MapPin className="size-4 text-fg-dim" aria-hidden />} label="Default address">
+                {primary ? (
+                  <span className="block text-fg">
+                    {primary.line1}, {primary.city} {primary.postalCode}
+                  </span>
+                ) : (
+                  <Link href="/account/addresses" className="text-brand hover:underline">
+                    Add an address
+                  </Link>
+                )}
+              </Row>
               <Row icon={<CalendarDays className="size-4 text-fg-dim" aria-hidden />} label="Member since">
                 <span className="text-fg">{dateFmt.format(viewer.createdAt)}</span>
               </Row>
             </dl>
-            {!viewer.phone && (
-              <div className="m-4 mt-0 rounded-xl bg-mint-soft px-3.5 py-3 text-xs leading-relaxed text-leaf">
-                Add a phone number so engineers can reach you about on-site visits.{" "}
-                <Link href="/account/profile" className="font-medium underline underline-offset-2">
-                  Add phone
-                </Link>
-              </div>
-            )}
           </Panel>
 
           <Panel title="Shop by category" href="/products" linkLabel="All">
@@ -107,7 +127,7 @@ async function Overview() {
               {productCategories.map((c) => (
                 <li key={c.id}>
                   <Link
-                    href={`/products#${c.id}`}
+                    href={`/products?category=${c.id}`}
                     className="inline-flex h-8 items-center rounded-full border border-line bg-ink-950 px-3 text-xs text-fg-muted transition-colors hover:border-brand/40 hover:text-fg"
                   >
                     {c.label}

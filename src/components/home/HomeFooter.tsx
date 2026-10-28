@@ -1,14 +1,17 @@
 import Link from "next/link";
 import { navLinks, policyLinks, site, telHref } from "@/config/site";
 import { productCategories } from "@/data/products";
-import { services } from "@/data/services";
+import { getServices } from "@/lib/server/services";
+import { getSettings } from "@/lib/server/settings";
+import { shopContact } from "@/lib/settings";
 import { Logo } from "@/components/ui/Logo";
 
-export function HomeFooter() {
-  const c = site.contact;
+export async function HomeFooter() {
+  const [services, shop] = await Promise.all([getServices(), getSettings("shop")]);
+  const c = shopContact(shop);
   const columns = [
     { title: "Navigate", links: navLinks.map((l) => ({ label: l.label, href: l.href })) },
-    { title: "Products", links: productCategories.map((p) => ({ label: p.label, href: `/products#${p.id}` })) },
+    { title: "Products", links: productCategories.map((p) => ({ label: p.label, href: `/products?category=${p.id}` })) },
     { title: "Services", links: services.map((s) => ({ label: s.title.replace(/ and .*/, ""), href: `/services/${s.slug}` })) },
   ];
 
@@ -19,9 +22,9 @@ export function HomeFooter() {
           <div>
             <Logo />
             <p className="mt-5 max-w-xs text-sm leading-relaxed text-fg-muted">{site.description}</p>
-            {site.social.length > 0 && (
+            {c.social.length > 0 && (
               <ul className="mt-6 flex gap-4">
-                {site.social.map((s) => (
+                {c.social.map((s) => (
                   <li key={s.href}>
                     <a href={s.href} target="_blank" rel="noopener noreferrer" className="text-sm text-fg-muted hover:text-fg">
                       {s.label}

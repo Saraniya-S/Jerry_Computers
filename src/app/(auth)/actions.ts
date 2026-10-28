@@ -6,7 +6,10 @@ import { z } from "zod";
 import { roleHome, safeNext } from "@/lib/server/auth";
 import { dummyPasswordHash, hashPassword, verifyPassword } from "@/lib/server/crypto";
 import { db, schema } from "@/lib/server/db";
+import { env } from "@/lib/server/env";
+import { sendPasswordResetEmail } from "@/lib/server/mail";
 import { issueChallenge, OtpError, resendChallenge, verifyChallenge } from "@/lib/server/otp";
+import { consumePasswordToken, issuePasswordToken, recentResetCount } from "@/lib/server/password-tokens";
 import { clearChallengeCookie, createSession, deleteSession, getChallengeCookie, setChallengeCookie } from "@/lib/server/session";
 
 export type FormState = {
@@ -113,6 +116,7 @@ export async function login(_: FormState, formData: FormData): Promise<FormState
     return { error: "That email and password don't match an account.", values };
   }
 
+  if (user.disabledAt) return { error: "This account has been switched off. Contact the shop if you think that's a mistake.", values };
   await db.update(schema.users).set({ failedLogins: 0, lockedUntil: null }).where(eq(schema.users.id, user.id));
 
   let challenge;
@@ -150,10 +154,14 @@ export async function verifyCode(_: FormState, formData: FormData): Promise<Form
   await clearChallengeCookie();
   await createSession(result.user.id, { remember: formData.get("remember") !== "0" });
 
+  // A new customer goes through the welcome steps first.
+  if (result.purpose === "register" && result.user.role === "customer" && !result.user.onboardedAt) redirect("/onboarding");
+
   const home = roleHome[result.user.role];
   const next = safeNext(formData.get("next"), home);
   // Customers can't be sent into staff areas and vice versa.
-  redirect(result.user.role === "customer" && next.startsWith("/account") ? next : home);
+  const allowed = result.user.role === "customer" ? next.startsWith("/account") : result.user.role !== "engineer" && next.startsWith("/admin");
+  redirect(allowed ? next : home);
 }
 
 export async function resendCode(): Promise<FormState> {
@@ -171,4 +179,51 @@ export async function resendCode(): Promise<FormState> {
 export async function logout() {
   await deleteSession();
   redirect("/login");
+}
+
+/** Emails a reset link. Always answers the same way so it doesn't reveal which emails have accounts. */
+export async function requestPasswordReset(_: FormState, formData: FormData): Promise<FormState> {
+  const parsed = email.safeParse(formData.get("email"));
+  if (!parsed.success) return { fieldErrors: { email: "Enter a valid email address." }, values: { email: String(formData.get("email") ?? "") } };
+  const [user] = await db.select().from(schema.users).where(eq(schema.users.email, parsed.data)).limit(1);
+  if (user && !user.disabledAt && (await recentResetCount(user.id)) < 3) {
+    try {
+      const token = await issuePasswordToken(user.id, "reset");
+      await sendPasswordResetEmail({ to: user.email, name: user.firstName, link: `${env.APP_URL}/set-password?token=${token}` });
+    } catch (err) {
+      console.error("[auth] could not send reset email", err);
+    }
+  }
+  return { message: `If ${parsed.data} has an account, we've sent a link to reset the password. Check your inbox.` };
+}
+
+const newPassword = z.object({
+  token: z.string().min(20).max(100),
+  password: z.string().min(8, "Use at least 8 characters.").max(128, "Use 128 characters or fewer."),
+  confirm: z.string(),
+});
+
+/** Sets a password from an invite or reset link, then sends the person to sign in. */
+export async function setPasswordAction(_: FormState, formData: FormData): Promise<FormState> {
+  const parsed = newPassword.safeParse(Object.fromEntries(formData));
+  if (!parsed.success) return { fieldErrors: fieldErrors(parsed.error) };
+  if (parsed.data.password !== parsed.data.confirm) return { fieldErrors: { confirm: "The passwords don't match." } };
+  const found = await consumePasswordToken(parsed.data.token);
+  if (!found) return { error: "This link has expired or was already used. Ask for a new one." };
+
+  const now = new Date();
+  await db
+    .update(schema.users)
+    .set({
+      passwordHash: await hashPassword(parsed.data.password),
+      // The link went to this inbox, so the email is proven.
+      emailVerifiedAt: found.user.emailVerifiedAt ?? now,
+      failedLogins: 0,
+      lockedUntil: null,
+      ...(found.user.role !== "customer" && !found.user.onboardedAt ? { onboardedAt: now } : {}),
+    })
+    .where(eq(schema.users.id, found.user.id));
+  // A new password signs out every other device.
+  await db.delete(schema.sessions).where(eq(schema.sessions.userId, found.user.id));
+  redirect(`/login?notice=${found.token.purpose === "invite" ? "welcome" : "reset"}`);
 }

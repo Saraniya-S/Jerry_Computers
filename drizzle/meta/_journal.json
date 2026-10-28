@@ -8,6 +8,48 @@
       "when": 1793031592210,
       "tag": "0000_auth",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1793033193693,
+      "tag": "0001_profile_addresses_cart",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1793119225517,
+      "tag": "0002_orders_invoices",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1793120887185,
+      "tag": "0003_catalogue_staff_settings",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1793120894769,
+      "tag": "0004_seed_catalogue_and_payments",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1793120969074,
+      "tag": "0005_payment_fulfilment_constraints",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1793202038925,
+      "tag": "0006_admin_portal",
+      "breakpoints": true
     }
   ]
 }
