@@ -66,6 +66,20 @@ export async function redirectIfSignedIn() {
   if (user) redirect(roleHome[user.role]);
 }
 
+/** Areas each role may be sent back to after signing in; anything else goes to their home. */
+const returnAreas: Record<UserRole, string[]> = {
+  customer: ["/account", "/checkout", "/services/request"],
+  ecommerce_staff: ["/staff"],
+  engineer: ["/engineer"],
+  admin: ["/admin", "/staff"],
+};
+
+/** The post-sign-in destination for this role: `next` if it's in one of their areas, else their home. */
+export function returnTo(role: UserRole, next: unknown) {
+  const path = safeNext(next, roleHome[role]);
+  return returnAreas[role].some((a) => path === a || path.startsWith(`${a}/`) || path.startsWith(`${a}?`)) ? path : roleHome[role];
+}
+
 /** Only same-site paths are allowed as post-login destinations. */
 export function safeNext(next: unknown, fallback: string) {
   return typeof next === "string" && next.startsWith("/") && !next.startsWith("//") && !next.startsWith("/\\") ? next : fallback;

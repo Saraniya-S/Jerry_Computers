@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { type AnyPgColumn, boolean, check, index, integer, jsonb, pgEnum, pgTable, primaryKey, serial, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
+import { type AnyPgColumn, boolean, check, date, index, integer, jsonb, pgEnum, pgTable, primaryKey, serial, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
 
 export const userRole = pgEnum("user_role", ["customer", "engineer", "ecommerce_staff", "admin"]);
 export const otpPurpose = pgEnum("otp_purpose", ["register", "login"]);
@@ -605,6 +605,10 @@ export const serviceRequests = pgTable(
     /** Where the engineer goes, for on-site jobs. */
     serviceAddress: jsonb("service_address").$type<ServiceAddress>(),
     deviceType: deviceType("device_type").notNull(),
+    /** The service the customer picked on the request page (null for staff-logged jobs). */
+    serviceId: uuid("service_id").references(() => services.id, { onDelete: "set null" }),
+    /** The problem they chose from that service's list, if any. */
+    problemType: text("problem_type"),
     deviceBrand: text("device_brand"),
     deviceModel: text("device_model"),
     serialNumber: text("serial_number"),
@@ -615,6 +619,11 @@ export const serviceRequests = pgTable(
     status: serviceStatus("status").notNull().default("open"),
     assignedEngineerId: uuid("assigned_engineer_id").references(() => users.id, { onDelete: "restrict" }),
     assignedAt: timestamp("assigned_at", { withTimezone: true }),
+    /** The customer's preferred day and part of day. A wish, not a booking: staff confirm via scheduledAt. */
+    preferredDate: date("preferred_date", { mode: "string" }),
+    preferredWindow: text("preferred_window"),
+    /** Random id the request form sends once per submission, so retries and double clicks don't make two tickets. */
+    clientRequestId: uuid("client_request_id"),
     /** Agreed visit or bench time, set by the admin or the assigned engineer. */
     scheduledAt: timestamp("scheduled_at", { withTimezone: true }),
     /** When the current engineer accepted the job; cleared when it moves to someone else. */
@@ -634,6 +643,8 @@ export const serviceRequests = pgTable(
     index("service_requests_status_idx").on(t.status),
     index("service_requests_engineer_idx").on(t.assignedEngineerId, t.status),
     index("service_requests_scheduled_idx").on(t.assignedEngineerId, t.scheduledAt),
+    uniqueIndex("service_requests_client_request_key").on(t.customerId, t.clientRequestId).where(sql`${t.clientRequestId} is not null`),
+    check("service_requests_preferred_window", sql`${t.preferredWindow} is null or ${t.preferredWindow} in ('morning', 'afternoon', 'evening')`),
     index("service_requests_customer_idx").on(t.customerId),
     index("service_requests_created_idx").on(t.createdAt),
     check("service_requests_on_site_address", sql`${t.location} = 'in_shop' or ${t.serviceAddress} is not null`),

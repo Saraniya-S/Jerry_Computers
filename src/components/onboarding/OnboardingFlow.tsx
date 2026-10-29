@@ -20,13 +20,20 @@ const steps = [
 ] as const;
 type StepId = (typeof steps)[number]["id"];
 
-type Props = { firstName: string; lastName: string; phone: string; email: string };
+type Props = {
+  firstName: string;
+  lastName: string;
+  phone: string;
+  email: string;
+  /** Where to go after the welcome steps, when the customer signed up partway through something. */
+  continueTo?: { href: string; label: string };
+};
 
 /**
  * Welcome steps after a customer verifies their email, after ReactBits Pro "Onboarding 7":
  * a numbered stepper across the top and one short, focused form per step.
  */
-export function OnboardingFlow({ firstName, lastName, phone, email }: Props) {
+export function OnboardingFlow({ firstName, lastName, phone, email, continueTo }: Props) {
   const reduce = useReducedMotion();
   const [step, setStep] = useState<StepId>("contact");
   const [dir, setDir] = useState(1);
@@ -96,7 +103,7 @@ export function OnboardingFlow({ firstName, lastName, phone, email }: Props) {
           </Link>
           <Stepper current={index} />
           {step !== "finish" ? (
-            <Link href="/account" className="ml-auto shrink-0 text-sm text-fg-muted hover:text-fg">
+            <Link href={continueTo?.href ?? "/account"} className="ml-auto shrink-0 text-sm text-fg-muted hover:text-fg">
               Skip for now
             </Link>
           ) : (
@@ -226,8 +233,8 @@ export function OnboardingFlow({ firstName, lastName, phone, email }: Props) {
                     <Link href="/products" className="inline-flex h-11 items-center justify-center rounded-xl border border-line-strong bg-ink-850 text-sm font-medium text-fg hover:bg-ink-900">
                       Start shopping
                     </Link>
-                    <Link href="/account" className="inline-flex h-11 items-center justify-center rounded-xl bg-brand text-sm font-medium text-white hover:bg-[var(--brand-hover)]">
-                      Go to my account
+                    <Link href={continueTo?.href ?? "/account"} className="inline-flex h-11 items-center justify-center rounded-xl bg-brand text-sm font-medium text-white hover:bg-[var(--brand-hover)]">
+                      {continueTo?.label ?? "Go to my account"}
                     </Link>
                   </div>
                 </div>

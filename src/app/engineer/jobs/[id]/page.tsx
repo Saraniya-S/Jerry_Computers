@@ -12,6 +12,7 @@ import { getMyJob, transferCandidates } from "@/lib/server/engineer/jobs";
 import { getSettings } from "@/lib/server/settings";
 import { deviceTypeLabel, engineerFlow, isActiveStatus, isClosedStatus, noteKindLabel, serviceNumber, serviceStatusLabel } from "@/lib/service-desk";
 import { locationLinks } from "@/lib/service-location";
+import { preferredLabel } from "@/lib/service-request-form";
 
 export const metadata: Metadata = { title: "Job" };
 
@@ -81,6 +82,12 @@ async function Job({ params }: Pick<PageProps<"/engineer/jobs/[id]">, "params">)
               <Item k="Accepted" v={job.acceptedAt ? fullDateTimeFmt.format(job.acceptedAt) : "Not yet"} />
               <Item k="Scheduled" v={job.scheduledAt ? fullDateTimeFmt.format(job.scheduledAt) : "Not scheduled"} />
               <Item k="Logged" v={fullDateTimeFmt.format(job.createdAt)} />
+              {job.source === "online" && (
+                <>
+                  <Item k="Customer's chosen problem" v={job.problemType ?? "Something else"} />
+                  <Item k="Customer's preferred time" v={preferredLabel(job.preferredDate, job.preferredWindow) ?? "No preference"} />
+                </>
+              )}
             </dl>
             {job.resolution && (
               <div className="rounded-lg bg-mint-soft px-3 py-2 text-leaf">

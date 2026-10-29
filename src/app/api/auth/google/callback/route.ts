@@ -1,6 +1,6 @@
 import { eq, or } from "drizzle-orm";
 import { NextResponse, type NextRequest } from "next/server";
-import { safeNext } from "@/lib/server/auth";
+import { returnTo } from "@/lib/server/auth";
 import { db, schema } from "@/lib/server/db";
 import { googleEnabled } from "@/lib/server/env";
 import { GOOGLE_STATE_COOKIE, googleProfile } from "@/lib/server/google";
@@ -71,9 +71,9 @@ export async function GET(request: NextRequest) {
         .returning();
 
   await createSession(user.id);
-  const next = safeNext(saved.next, "/account");
-  // New Google sign-ups go through the welcome steps first.
-  const dest = !user.onboardedAt && !existing ? "/onboarding" : next.startsWith("/account") ? next : "/account";
+  const next = returnTo("customer", saved.next);
+  // New Google sign-ups go through the welcome steps first, then on to where they were going.
+  const dest = !user.onboardedAt && !existing ? (next === "/account" ? "/onboarding" : `/onboarding?next=${encodeURIComponent(next)}`) : next;
   const res = NextResponse.redirect(new URL(dest, request.url));
   res.cookies.delete({ name: GOOGLE_STATE_COOKIE, path: "/api/auth/google" });
   return res;

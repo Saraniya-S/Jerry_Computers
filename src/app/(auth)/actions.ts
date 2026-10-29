@@ -3,7 +3,7 @@
 import { eq, sql } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import { z } from "zod";
-import { roleHome, safeNext } from "@/lib/server/auth";
+import { returnTo, roleHome, safeNext } from "@/lib/server/auth";
 import { dummyPasswordHash, hashPassword, verifyPassword } from "@/lib/server/crypto";
 import { db, schema } from "@/lib/server/db";
 import { env } from "@/lib/server/env";
@@ -154,14 +154,13 @@ export async function verifyCode(_: FormState, formData: FormData): Promise<Form
   await clearChallengeCookie();
   await createSession(result.user.id, { remember: formData.get("remember") !== "0" });
 
-  // A new customer goes through the welcome steps first.
-  if (result.purpose === "register" && result.user.role === "customer" && !result.user.onboardedAt) redirect("/onboarding");
-
-  const home = roleHome[result.user.role];
-  const next = safeNext(formData.get("next"), home);
   // Customers can't be sent into staff areas and vice versa.
-  const allowed = result.user.role === "customer" ? next.startsWith("/account") : result.user.role !== "engineer" && next.startsWith("/admin");
-  redirect(allowed ? next : home);
+  const next = returnTo(result.user.role, formData.get("next"));
+  // A new customer goes through the welcome steps first, then on to where they were going.
+  if (result.purpose === "register" && result.user.role === "customer" && !result.user.onboardedAt) {
+    redirect(next === roleHome.customer ? "/onboarding" : `/onboarding?next=${encodeURIComponent(next)}`);
+  }
+  redirect(next);
 }
 
 export async function resendCode(): Promise<FormState> {

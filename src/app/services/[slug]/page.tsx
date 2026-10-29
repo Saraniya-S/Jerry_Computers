@@ -30,7 +30,7 @@ export default async function ServicePage({ params }: PageProps<"/services/[slug
         ))}
       </ul>
       <div className="mt-10 flex flex-wrap gap-3">
-        <ButtonLink href="/services/request" variant="brand">
+        <ButtonLink href={`/services/request?service=${service.slug}`} variant="brand">
           Request this service
         </ButtonLink>
         <ButtonLink href="/#services" variant="outline">

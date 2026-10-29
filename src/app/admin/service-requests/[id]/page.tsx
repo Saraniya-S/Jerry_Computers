@@ -14,6 +14,7 @@ import { getServiceRequest, listTransfers } from "@/lib/server/admin/service-req
 import { requirePermission } from "@/lib/server/permissions";
 import { deviceTypeLabel, isActiveStatus, noteKindLabel, serviceFlow, serviceNumber, serviceStatusLabel } from "@/lib/service-desk";
 import { locationLinks } from "@/lib/service-location";
+import { preferredLabel } from "@/lib/service-request-form";
 
 export const metadata: Metadata = { title: "Service request" };
 
@@ -74,6 +75,12 @@ async function ServiceRequest({ params, searchParams }: Pick<PageProps<"/admin/s
                   ["Serial number", job.serialNumber ?? "—"],
                   ["Left with the device", job.accessories ?? "—"],
                   ["Came in by", job.source === "walk_in" ? "Walk-in" : job.source === "phone" ? "Phone" : "Online booking"],
+                  ...(job.source === "online"
+                    ? ([
+                        ["Customer's chosen problem", job.problemType ?? "Something else"],
+                        ["Customer's preferred time", preferredLabel(job.preferredDate, job.preferredWindow) ?? "No preference"],
+                      ] as const)
+                    : []),
                   ["Scheduled", job.scheduledAt ? fullDateTimeFmt.format(job.scheduledAt) : "Not scheduled"],
                   ["Accepted by engineer", job.acceptedAt ? fullDateTimeFmt.format(job.acceptedAt) : job.assignedEngineerId ? "Not yet" : "—"],
                 ] as const

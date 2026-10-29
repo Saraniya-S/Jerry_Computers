@@ -28,7 +28,10 @@ import { AdminError, audit, isUniqueViolation } from "./tx";
  * Creates a service request and assigns it in the same transaction (see assignment.ts).
  * customerId links an account; otherwise the walk-in's contact details are stored on the job only.
  */
-export async function createServiceRequest(actorId: string, input: ServiceRequestInput) {
+/** Fields only the customer request page sets; validated by its own module before they get here. */
+export type OnlineRequestExtras = { serviceId: string; problemType: string | null; preferredDate: string | null; preferredWindow: string | null; clientRequestId: string };
+
+export async function createServiceRequest(actorId: string, input: ServiceRequestInput, extras?: OnlineRequestExtras) {
   const parsed = serviceRequestInput.safeParse(input);
   if (!parsed.success) {
     const fields: Record<string, string> = {};
@@ -66,6 +69,7 @@ export async function createServiceRequest(actorId: string, input: ServiceReques
         issue: v.issue,
         priority: v.priority,
         createdById: actorId,
+        ...extras,
       })
       .returning();
     await tx.insert(schema.serviceEvents).values({ requestId: job.id, toStatus: "open", note: `Request created (${v.source.replace("_", "-")}, ${v.location === "on_site" ? "on-site" : "in shop"})`, actorId });
