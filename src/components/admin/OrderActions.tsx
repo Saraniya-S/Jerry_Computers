@@ -1,8 +1,8 @@
 "use client";
 
-import { Download, Mail, Undo2, Wallet } from "lucide-react";
+import { Download, Mail, RefreshCw, Undo2, Wallet } from "lucide-react";
 import { useState } from "react";
-import { recordPaymentAction, recordRefundAction, resendInvoiceAction, updateStatusAction } from "@/app/admin/actions";
+import { approveRefundAction, recordPaymentAction, recordRefundAction, resendInvoiceAction, syncPaymentAction, syncRefundAction, updateStatusAction } from "@/app/admin/actions";
 import { SelectField, TextField } from "@/components/forms/controls";
 import { couriers, type CourierCode } from "@/lib/couriers";
 import type { OrderStatus } from "@/lib/server/db/schema";
@@ -14,20 +14,21 @@ type Props = {
   orderId: string;
   status: OrderStatus;
   next: Next[];
+  /** Cash on delivery, dispatched and not yet recorded. */
   canRecordPayment: boolean;
   paymentMethod: "cod" | "online";
   hasInvoice: boolean;
-  /** Shown when packing/shipping is blocked until payment. */
+  /** Online order still waiting for Razorpay: blocks packing and shipping. */
   waitingForPayment: boolean;
-  /** A cancelled paid order whose refund isn't recorded yet, and the viewer may record it. */
-  canRecordRefund: boolean;
+  /** Set when a refund is due and the viewer may approve it: through Razorpay, or recorded by hand for cash. */
+  refund: null | { mode: "gateway" | "manual"; pending: boolean };
   /** COD not dispatched yet: payment can't be recorded until the courier collects it. */
   codWaitsForDispatch?: boolean;
   invoiceHref: string;
 };
 
 /** Payment, fulfilment and invoice actions for one order. */
-export function OrderActions({ orderId, status, next, canRecordPayment, paymentMethod, hasInvoice, waitingForPayment, canRecordRefund, codWaitsForDispatch, invoiceHref }: Props) {
+export function OrderActions({ orderId, status, next, canRecordPayment, hasInvoice, waitingForPayment, refund, codWaitsForDispatch, invoiceHref }: Props) {
   const [reference, setReference] = useState("");
   const [refundRef, setRefundRef] = useState("");
   const [shipment, setShipment] = useState({ courierCode: "" as CourierCode | "", courierName: "", trackingNumber: "", trackingUrl: "" });
@@ -44,31 +45,33 @@ export function OrderActions({ orderId, status, next, canRecordPayment, paymentM
         {canRecordPayment && (
           <>
             <button type="button" onClick={() => setOpen(open === "pay" ? null : "pay")} aria-expanded={open === "pay"} className={primary}>
-              <Wallet className="size-4" aria-hidden /> Record payment
+              <Wallet className="size-4" aria-hidden /> Record cash collected
             </button>
             {open === "pay" && (
               <div className="grid gap-3 rounded-lg border border-line bg-ink-950 p-3">
                 <TextField
-                  label={paymentMethod === "cod" ? "Note" : "Payment reference"}
-                  optional={paymentMethod === "cod"}
+                  label="Note"
+                  optional
                   value={reference}
                   onChange={(e) => setReference(e.target.value)}
-                  placeholder={paymentMethod === "cod" ? "Cash collected by courier" : "UPI / bank transaction ID"}
-                  hint={paymentMethod === "online" ? "Check it against your bank or UPI statement first. The customer is emailed the invoice PDF." : "Printed on the invoice. The customer is emailed the invoice PDF."}
+                  placeholder="Cash collected by courier"
+                  hint="Record it once the courier has handed over the cash. Printed on the invoice, which is emailed to the customer."
                 />
-                <button
-                  type="button"
-                  onClick={() => go("pay", () => recordPaymentAction(orderId, reference))}
-                  disabled={busy !== null || (paymentMethod === "online" && !reference.trim())}
-                  className={primary}
-                >
+                <button type="button" onClick={() => go("pay", () => recordPaymentAction(orderId, reference))} disabled={busy !== null} className={primary}>
                   {spin("pay")} Confirm payment and send invoice
                 </button>
               </div>
             )}
           </>
         )}
-        {waitingForPayment && <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">Online order: record the payment (after checking the bank or UPI statement) before packing or shipping.</p>}
+        {waitingForPayment && (
+          <>
+            <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">Waiting for the customer to pay through Razorpay. It&apos;s marked paid automatically once Razorpay confirms; pack it after that.</p>
+            <button type="button" onClick={() => go("sync", () => syncPaymentAction(orderId))} disabled={busy !== null} className={btn}>
+              {busy === "sync" ? <Spinner /> : <RefreshCw className="size-4" aria-hidden />} Check payment with Razorpay
+            </button>
+          </>
+        )}
         {codWaitsForDispatch && <p className="rounded-lg bg-ink-950 px-3 py-2 text-xs text-fg-muted">Cash on delivery: payment is recorded after dispatch, once the courier has collected it.</p>}
         {next.includes("confirmed") && (
           <button type="button" onClick={() => go("confirmed", () => updateStatusAction({ orderId, to: "confirmed" }))} disabled={busy !== null} className={primary}>
@@ -134,10 +137,33 @@ export function OrderActions({ orderId, status, next, canRecordPayment, paymentM
             </button>
           </>
         )}
-        {canRecordRefund && (
+        {refund?.pending && (
+          <>
+            <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">Refund sent to Razorpay; waiting for Razorpay to confirm it.</p>
+            <button type="button" onClick={() => go("syncRefund", () => syncRefundAction(orderId))} disabled={busy !== null} className={btn}>
+              {busy === "syncRefund" ? <Spinner /> : <RefreshCw className="size-4" aria-hidden />} Check refund status
+            </button>
+          </>
+        )}
+        {refund && !refund.pending && refund.mode === "gateway" && (
+          <ConfirmDialog
+            title="Approve the refund?"
+            tone="primary"
+            confirmLabel="Approve refund"
+            onConfirm={() => approveRefundAction(orderId)}
+            trigger={(o) => (
+              <button type="button" onClick={o} disabled={busy !== null} className={btn}>
+                <Undo2 className="size-4" aria-hidden /> Approve refund
+              </button>
+            )}
+          >
+            The amount paid is sent back to the customer&apos;s original payment method through Razorpay. The order shows refunded once Razorpay confirms.
+          </ConfirmDialog>
+        )}
+        {refund && !refund.pending && refund.mode === "manual" && (
           <>
             <button type="button" onClick={() => setOpen(open === "refund" ? null : "refund")} aria-expanded={open === "refund"} className={btn}>
-              <Undo2 className="size-4" aria-hidden /> Record refund
+              <Undo2 className="size-4" aria-hidden /> Record cash refund
             </button>
             {open === "refund" && (
               <div className="grid gap-3 rounded-lg border border-line bg-ink-950 p-3">

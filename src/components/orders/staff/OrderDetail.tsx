@@ -65,7 +65,9 @@ export async function OrderDetail({ id, staff, basePath, customerHref }: { id: s
                   <li key={p.id} className="flex flex-wrap items-start justify-between gap-3 px-4 py-3">
                     <div>
                       <p className="flex items-center gap-2 text-fg">
-                        <Badge tone={p.kind === "payment" ? "good" : "bad"}>{p.kind === "payment" ? "Payment received" : "Refund sent"}</Badge>
+                        <Badge tone={p.status === "failed" ? "muted" : p.kind === "payment" ? "good" : "bad"}>
+                          {p.kind === "payment" ? "Payment received" : p.status === "pending" ? "Refund processing" : p.status === "failed" ? "Refund failed" : "Refund sent"}
+                        </Badge>
                         {paymentLabel[p.method]}
                         {p.provider !== "manual" && <span className="text-xs text-fg-dim">via {p.provider}</span>}
                       </p>
@@ -91,7 +93,7 @@ export async function OrderDetail({ id, staff, basePath, customerHref }: { id: s
               <p className="px-4 py-3 text-sm text-fg-muted">
                 No payment recorded.{" "}
                 {order.paymentMethod === "online"
-                  ? "No payment gateway is connected, so an online payment counts only once staff confirm it against the bank or UPI statement."
+                  ? "Waiting for the customer to pay through Razorpay. It's recorded here automatically once Razorpay confirms the payment."
                   : codNotYet
                     ? "Cash is collected by the courier on delivery; record it after dispatch, once it has been collected."
                     : "Record the cash once the courier hands it over."}
@@ -139,7 +141,14 @@ export async function OrderDetail({ id, staff, basePath, customerHref }: { id: s
             paymentMethod={order.paymentMethod}
             canRecordPayment={can(staff.role, "payments.record") && canRecordPayment(order)}
             codWaitsForDispatch={can(staff.role, "payments.record") && codNotYet}
-            canRecordRefund={can(staff.role, "payments.refund") && order.paymentStatus === "refund_pending"}
+            refund={
+              can(staff.role, "payments.refund") && order.paymentStatus === "refund_pending"
+                ? {
+                    mode: order.payments.some((p) => p.provider === "razorpay" && p.kind === "payment" && p.status === "succeeded") ? "gateway" : "manual",
+                    pending: order.payments.some((p) => p.kind === "refund" && p.status === "pending"),
+                  }
+                : null
+            }
             hasInvoice={Boolean(order.invoice)}
             invoiceHref={`${basePath}/${order.id}/invoice`}
             waitingForPayment={waitingForPayment}

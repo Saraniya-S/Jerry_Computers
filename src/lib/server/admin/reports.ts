@@ -4,6 +4,7 @@ import { and, count, desc, eq, gte, isNull, lt, ne, notInArray, sql } from "driz
 import { OPEN_FOR_ADMIN_STATUSES } from "@/lib/service-desk";
 import { db, schema } from "../db";
 import type { DeviceType, OrderStatus, ServiceStatus } from "../db/schema";
+import { collectionTotals } from "./collections";
 import { listEngineers } from "./engineers";
 
 const sum = (col: unknown) => sql<number>`coalesce(sum(${col}), 0)::int`;
@@ -197,7 +198,9 @@ export async function serviceReport(r: Range) {
       .where(and(gte(schema.transferRequests.createdAt, start(r.from)), lt(schema.transferRequests.createdAt, endExclusive(r.to)))),
   ]);
   const [pending] = await db.select({ n: count() }).from(schema.transferRequests).where(eq(schema.transferRequests.status, "pending"));
+  const collected = await collectionTotals(start(r.from), endExclusive(r.to));
   return {
+    collected,
     byStatus: byStatus as { status: ServiceStatus; n: number }[],
     byDevice: byDevice as { device: DeviceType; n: number }[],
     byLocation,

@@ -7,6 +7,7 @@ import { LogoMark } from "@/components/ui/Logo";
 import { requireCustomer } from "@/lib/server/auth";
 import { getCart } from "@/lib/server/cart";
 import { listAddresses } from "@/lib/server/customer";
+import { razorpayEnabled } from "@/lib/server/env";
 import { getSettings } from "@/lib/server/settings";
 
 export const metadata: Metadata = { title: "Checkout" };
@@ -42,6 +43,7 @@ async function Checkout() {
     <CheckoutForm
       items={cart}
       store={store}
+      onlineAvailable={razorpayEnabled}
       addresses={addresses.map((a) => ({
         id: a.id,
         label: a.label,

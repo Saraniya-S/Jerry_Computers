@@ -16,9 +16,17 @@ const schema = z.object({
   MAIL_FROM: z.string().min(1),
   GOOGLE_CLIENT_ID: z.string().optional(),
   GOOGLE_CLIENT_SECRET: z.string().optional(),
+  /** Razorpay API keys (Dashboard → Account & Settings → API keys). rzp_test_… keys take test payments only. */
+  RAZORPAY_KEY_ID: z.string().optional(),
+  RAZORPAY_KEY_SECRET: z.string().optional(),
+  /** The secret typed when adding the webhook in the Razorpay dashboard. */
+  RAZORPAY_WEBHOOK_SECRET: z.string().optional(),
 });
 
 /** Server configuration, validated once on first use. See .env.example. */
 export const env = schema.parse(process.env);
 
 export const googleEnabled = Boolean(env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET);
+
+/** Online payments need both API keys; without them checkout offers cash on delivery only. */
+export const razorpayEnabled = Boolean(env.RAZORPAY_KEY_ID && env.RAZORPAY_KEY_SECRET);

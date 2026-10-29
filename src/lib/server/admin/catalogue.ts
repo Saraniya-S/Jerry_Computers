@@ -97,6 +97,7 @@ export async function saveProduct(actorId: string, id: string | null, input: Pro
         lowStockThreshold: v.lowStockThreshold,
         isActive: v.isActive,
         isFeatured: v.isFeatured,
+        codAvailable: v.codAvailable,
         artVariant: v.artVariant,
       };
 

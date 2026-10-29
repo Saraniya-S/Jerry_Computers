@@ -32,17 +32,15 @@ export const shopSchema = z.object({
 export type ShopSettings = z.infer<typeof shopSchema>;
 
 export const storeSchema = z.object({
-  /** Flat delivery charge in paise; 0 for free delivery. */
+  /** Delivery charge in paise, added to every order. */
   shippingPaise: z.number().int().min(0).max(10_000_00).default(0),
-  /** Orders at or above this (paise) ship free; 0 to always charge. */
-  freeShippingAbovePaise: z.number().int().min(0).max(100_000_00).default(0),
+  /** Master switch; each product also has to allow cash on delivery. */
   codEnabled: z.boolean().default(true),
 });
 export type StoreSettings = z.infer<typeof storeSchema>;
 
-export function shippingFor(itemsTotalPaise: number, store: StoreSettings) {
-  if (!store.shippingPaise) return 0;
-  if (store.freeShippingAbovePaise && itemsTotalPaise >= store.freeShippingAbovePaise) return 0;
+/** Every order carries the delivery charge; there's no free-delivery threshold. */
+export function shippingFor(store: StoreSettings) {
   return store.shippingPaise;
 }
 

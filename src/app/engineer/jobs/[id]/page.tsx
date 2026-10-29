@@ -7,6 +7,9 @@ import { PageHeader, PageSkeleton } from "@/components/account/PageHeader";
 import { PriorityBadge, ServiceStatusBadge } from "@/components/admin/ServiceBadges";
 import { Badge, fullDateTimeFmt } from "@/components/admin/ui";
 import { ScheduleForm, StatusForm, TransferForm, WorkNoteForm } from "@/components/engineer/JobActions";
+import { engineerCollectionAction } from "@/app/engineer/actions";
+import { CollectionsCard } from "@/components/admin/CollectionsCard";
+import { listCollections } from "@/lib/server/admin/collections";
 import { requireStaff } from "@/lib/server/auth";
 import { getMyJob, transferCandidates } from "@/lib/server/engineer/jobs";
 import { getSettings } from "@/lib/server/settings";
@@ -34,7 +37,11 @@ async function Job({ params }: Pick<PageProps<"/engineer/jobs/[id]">, "params">)
   // Only found when the job is assigned to this engineer; anything else is a plain 404.
   const job = /^[0-9a-f-]{36}$/i.test(id) ? await getMyJob(me.id, id) : null;
   if (!job) notFound();
-  const [candidates, shop] = await Promise.all([isActiveStatus(job.status) ? transferCandidates(me.id, job) : [], job.location === "in_shop" ? getSettings("shop") : null]);
+  const [candidates, shop, collections] = await Promise.all([
+    isActiveStatus(job.status) ? transferCandidates(me.id, job) : [],
+    job.location === "in_shop" ? getSettings("shop") : null,
+    listCollections(job.id),
+  ]);
   const pending = job.transfers.find((t) => t.t.status === "pending");
   const links = job.location === "on_site" ? locationLinks(job.serviceAddress) : null;
   const a = job.serviceAddress;
@@ -140,6 +147,15 @@ async function Job({ params }: Pick<PageProps<"/engineer/jobs/[id]">, "params">)
         </div>
 
         <div className="grid content-start gap-4">
+          <CollectionsCard
+            requestId={job.id}
+            rows={collections.rows}
+            totalPaise={collections.totalPaise}
+            canRecord={job.status !== "cancelled" && job.status !== "unable_to_complete"}
+            canCorrect={false}
+            onRecord={engineerCollectionAction}
+          />
+
           <Card title="Status">
             {job.status === "unable_to_complete" ? (
               <p className="text-fg-muted">You handed this job back. An admin will reassign or cancel it.</p>

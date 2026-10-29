@@ -9,7 +9,10 @@ import { recordShipmentEvent, updateShipmentDetails, type shipmentEventInput } f
 import { CATALOGUE_TAG } from "@/lib/server/catalogue";
 import { emailInvoice } from "@/lib/server/invoicing";
 import { addOrderNote, OrderError, recordPayment, recordRefund, updateOrderStatus } from "@/lib/server/orders";
+import { afterConfirm } from "@/lib/server/payment-events";
+import { approveGatewayRefund, syncOnlinePayment, syncRefunds } from "@/lib/server/payments";
 import { requirePermission } from "@/lib/server/permissions";
+import { GatewayError } from "@/lib/server/razorpay";
 
 export type AdminResult = ActionResult;
 
@@ -120,4 +123,41 @@ export async function addOrderNoteAction(orderId: string, note: string): Promise
   });
   if (res.ok) refresh();
   return res;
+}
+
+/** Asks Razorpay whether an online order has been paid (when the callback and webhook were missed). */
+export async function syncPaymentAction(orderId: string): Promise<AdminResult> {
+  await requirePermission("orders.view");
+  try {
+    const r = await syncOnlinePayment(uuid.parse(orderId));
+    await afterConfirm(r);
+    refresh();
+    return r.status === "paid" || r.status === "already_paid" ? { ok: true, message: "Razorpay confirms the payment. The order is marked paid." } : { ok: false, error: r.message };
+  } catch (err) {
+    if (err instanceof GatewayError || err instanceof OrderError) return { ok: false, error: err.message };
+    throw err;
+  }
+}
+
+/** Admin approval: sends the refund back through Razorpay. The order shows refunded once Razorpay confirms. */
+export async function approveRefundAction(orderId: string): Promise<AdminResult> {
+  const admin = await requirePermission("payments.refund");
+  const res = await attempt(async () => {
+    const r = await approveGatewayRefund(admin.id, uuid.parse(orderId));
+    return r.status === "processed" ? `Refund of ₹${r.amount / 100} processed by Razorpay.` : `Refund of ₹${r.amount / 100} sent to Razorpay. It shows as refunded once Razorpay confirms (usually within minutes).`;
+  });
+  refresh();
+  return res;
+}
+
+export async function syncRefundAction(orderId: string): Promise<AdminResult> {
+  await requirePermission("payments.refund");
+  try {
+    const n = await syncRefunds(uuid.parse(orderId));
+    refresh();
+    return { ok: true, message: n ? "Checked with Razorpay." : "No refunds are waiting on Razorpay." };
+  } catch (err) {
+    if (err instanceof GatewayError) return { ok: false, error: err.message };
+    throw err;
+  }
 }

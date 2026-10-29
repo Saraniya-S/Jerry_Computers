@@ -24,7 +24,7 @@ async function Settings() {
       <PageHeader title="Shop settings" description="Contact details, invoice details and checkout rules." />
       <ShopForm initial={shop} />
       <div className="border-t border-line" />
-      <StoreForm initial={{ shipping: store.shippingPaise ? paiseToInput(store.shippingPaise) : "", freeAbove: store.freeShippingAbovePaise ? paiseToInput(store.freeShippingAbovePaise) : "", codEnabled: store.codEnabled }} />
+      <StoreForm initial={{ shipping: store.shippingPaise ? paiseToInput(store.shippingPaise) : "", codEnabled: store.codEnabled }} />
     </>
   );
 }

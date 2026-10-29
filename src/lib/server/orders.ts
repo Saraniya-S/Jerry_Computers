@@ -11,6 +11,7 @@ import { createShipmentTx, deliverShipmentsTx, shipmentsForOrders } from "./admi
 import { audit } from "./admin/tx";
 import type { AddressSnapshot, InvoiceLine, OrderStatus, PaymentStatus } from "./db/schema";
 import { notify, notifyAdmins } from "./notifications";
+import { razorpayEnabled } from "./env";
 import { getSettings } from "./settings";
 
 export class OrderError extends Error {}
@@ -22,6 +23,7 @@ export class OrderError extends Error {}
 export async function placeOrder(userId: string, input: { addressId: string; paymentMethod: "cod" | "online"; note: string | null }) {
   const [catalogue, store] = await Promise.all([getCatalogue(), getSettings("store")]);
   if (input.paymentMethod === "cod" && !store.codEnabled) throw new OrderError("Cash on delivery isn't available right now. Choose online payment.");
+  if (input.paymentMethod === "online" && !razorpayEnabled) throw new OrderError("Online payment isn't available right now.");
   const bySlug = new Map(catalogue.map((p) => [p.slug, p]));
 
   return db.transaction(async (tx) => {
@@ -39,6 +41,9 @@ export async function placeOrder(userId: string, input: { addressId: string; pay
       if (!p || !canBuy(p)) throw new OrderError(`${p?.name ?? "A product in your cart"} is no longer available. Remove it to continue.`);
       return { p, quantity: l.quantity };
     });
+    // Cash on delivery is offered per product; one item without it means the order is paid online.
+    const noCod = lines.find(({ p }) => !p.codAvailable);
+    if (input.paymentMethod === "cod" && noCod) throw new OrderError(`${noCod.p.name} can't be paid for on delivery. Choose online payment.`);
 
     // Reserve stock; the WHERE guards against two people buying the last unit at once.
     const moved: { productId: string; delta: number; stockAfter: number }[] = [];
@@ -53,7 +58,7 @@ export async function placeOrder(userId: string, input: { addressId: string; pay
     }
 
     const itemsTotal = lines.reduce((s, { p, quantity }) => s + p.pricePaise! * quantity, 0);
-    const shipping = shippingFor(itemsTotal, store);
+    const shipping = shippingFor(store);
     const snapshot: AddressSnapshot = {
       label: address.label,
       recipientName: address.recipientName,
@@ -291,19 +296,25 @@ export function splitGst(amountPaise: number, rateBp: number) {
  * Records payment and issues the invoice in one step: the order becomes paid, a payment record is
  * written and an invoice with GST split out is frozen. Sending the PDF is the caller's job.
  *
- * This is the only way an order becomes paid. It is called by staff after checking the money
- * arrived (cash from the courier, or the UPI/bank credit), never because a browser says a payment
- * succeeded. A payment gateway should call it from its verified webhook, with provider set.
+ * This is the only way an order becomes paid. Cash on delivery is recorded by staff once the
+ * courier has collected it (provider "manual"); online orders only by the Razorpay flow after the
+ * payment is verified with Razorpay (provider "razorpay", reference = the pay_… id, no staff).
  */
-export async function recordPayment(orderId: string, reference: string, staffId: string, { provider = "manual" }: { provider?: string } = {}) {
+export async function recordPayment(orderId: string, reference: string, staffId: string | null, { provider = "manual" }: { provider?: "manual" | "razorpay" } = {}) {
   const shop = await getSettings("shop");
   return db.transaction(async (tx) => {
     const [order] = await tx.select().from(schema.orders).where(eq(schema.orders.id, orderId)).for("update");
     if (!order) throw new OrderError("Order not found.");
     if (order.status === "cancelled") throw new OrderError("This order is cancelled.");
     if (order.paymentStatus !== "pending") throw new OrderError("Payment is already recorded for this order.");
-    if (!canRecordPayment(order)) throw new OrderError("Cash on delivery is collected by the courier: record it once the order has been dispatched.");
-    if (order.paymentMethod === "online" && !reference.trim()) throw new OrderError("Enter the UPI or bank transaction ID you checked the payment against.");
+    if (provider === "manual") {
+      if (order.paymentMethod === "online") throw new OrderError("Online payments are recorded automatically once Razorpay confirms them.");
+      if (!canRecordPayment(order)) throw new OrderError("Cash on delivery is collected by the courier: record it once the order has been dispatched.");
+    } else {
+      if (order.paymentMethod !== "online") throw new OrderError("This order is paid on delivery.");
+      if (order.status === "returned") throw new OrderError("This order was returned.");
+      if (!reference.trim()) throw new OrderError("Missing the Razorpay payment id.");
+    }
 
     const [customer] = await tx.select().from(schema.users).where(eq(schema.users.id, order.userId));
     const items = await tx.select().from(schema.orderItems).where(eq(schema.orderItems.orderId, orderId));
@@ -367,13 +378,21 @@ export async function recordPayment(orderId: string, reference: string, staffId:
   });
 }
 
-/** Records that the money for a cancelled, paid order has been returned to the customer. */
+/**
+ * Records that the money for a cancelled, paid cash-on-delivery order has been handed back. Razorpay
+ * payments are refunded through Razorpay instead (approveRefund in payments.ts).
+ */
 export async function recordRefund(orderId: string, reference: string, staffId: string) {
   return db.transaction(async (tx) => {
     const [order] = await tx.select().from(schema.orders).where(eq(schema.orders.id, orderId)).for("update");
     if (!order) throw new OrderError("Order not found.");
     if (order.paymentStatus !== "refund_pending") throw new OrderError("There's no refund due on this order.");
     if (!reference.trim()) throw new OrderError("Enter the refund's UPI or bank transaction ID, or how the cash was returned.");
+    const [gateway] = await tx
+      .select({ id: schema.payments.id })
+      .from(schema.payments)
+      .where(and(eq(schema.payments.orderId, orderId), eq(schema.payments.provider, "razorpay")));
+    if (gateway) throw new OrderError("This order was paid through Razorpay, so the refund goes back through Razorpay.");
     const [{ paid }] = await tx
       .select({ paid: sql<number>`coalesce(sum(case when ${schema.payments.kind} = 'payment' then ${schema.payments.amountPaise} else -${schema.payments.amountPaise} end), 0)::int` })
       .from(schema.payments)
@@ -413,9 +432,10 @@ export function allowedNext(order: { status: OrderStatus; paymentMethod: "cod" |
 }
 
 /** Cash on delivery is collected by the courier, so it can only be recorded once the parcel has gone out. */
+/** Staff can record a payment only for cash on delivery, once dispatched (online payments come from Razorpay). */
 export function canRecordPayment(order: { status: OrderStatus; paymentMethod: "cod" | "online"; paymentStatus: PaymentStatus }) {
-  if (order.paymentStatus !== "pending" || order.status === "cancelled" || order.status === "returned") return false;
-  return order.paymentMethod === "online" || order.status === "shipped" || order.status === "delivered";
+  if (order.paymentStatus !== "pending" || order.paymentMethod !== "cod") return false;
+  return order.status === "shipped" || order.status === "delivered";
 }
 
 type StatusExtras = { shipment?: DispatchInput; cancelReason?: string };
@@ -427,7 +447,7 @@ export async function updateOrderStatus(orderId: string, to: OrderStatus, actorI
     if (!allowedNext(order).includes(to)) {
       throw new OrderError(
         order.paymentMethod === "online" && order.paymentStatus === "pending" && to !== "cancelled"
-          ? "Record the online payment before packing or shipping."
+          ? "Wait for the online payment to come through Razorpay before packing or shipping."
           : `An order that is "${order.status}" can't move to "${to}".`,
       );
     }

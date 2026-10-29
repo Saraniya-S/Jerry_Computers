@@ -9,7 +9,10 @@ import { AssignmentOverride, NoteForm, ScheduleSetter, StatusChanger } from "@/c
 import { TransferDecision } from "@/components/admin/TransferDecision";
 import { Badge, fullDateTimeFmt } from "@/components/admin/ui";
 import { FormAlert } from "@/components/auth/ui";
+import { recordCollectionAction } from "@/app/admin/service-requests/actions";
+import { CollectionsCard } from "@/components/admin/CollectionsCard";
 import { engineerWorkloads } from "@/lib/server/admin/assignment";
+import { listCollections } from "@/lib/server/admin/collections";
 import { getServiceRequest, listTransfers } from "@/lib/server/admin/service-requests";
 import { requirePermission } from "@/lib/server/permissions";
 import { deviceTypeLabel, isActiveStatus, noteKindLabel, serviceFlow, serviceNumber, serviceStatusLabel } from "@/lib/service-desk";
@@ -34,7 +37,11 @@ async function ServiceRequest({ params, searchParams }: Pick<PageProps<"/admin/s
   const [{ id }, { created }] = await Promise.all([params, searchParams]);
   const job = /^[0-9a-f-]{36}$/i.test(id) ? await getServiceRequest(id) : null;
   if (!job) notFound();
-  const [engineers, transfers] = await Promise.all([engineerWorkloads(undefined, { deviceType: job.deviceType, location: job.location }), listTransfers({ requestId: job.id })]);
+  const [engineers, transfers, collections] = await Promise.all([
+    engineerWorkloads(undefined, { deviceType: job.deviceType, location: job.location }),
+    listTransfers({ requestId: job.id }),
+    listCollections(job.id),
+  ]);
   const ticket = serviceNumber(job.seq);
   const a = job.serviceAddress;
   const links = job.location === "on_site" ? locationLinks(a) : null;
@@ -176,6 +183,8 @@ async function ServiceRequest({ params, searchParams }: Pick<PageProps<"/admin/s
         </div>
 
         <div className="grid content-start gap-4">
+          <CollectionsCard requestId={job.id} rows={collections.rows} totalPaise={collections.totalPaise} canRecord canCorrect onRecord={recordCollectionAction} />
+
           <section className="rounded-xl border border-line p-4">
             <h2 className="mb-3 text-sm font-medium text-fg">Status</h2>
             <StatusChanger requestId={job.id} next={serviceFlow[job.status]} />

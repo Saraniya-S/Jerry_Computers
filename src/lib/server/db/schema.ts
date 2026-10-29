@@ -163,6 +163,8 @@ export const orders = pgTable(
     paymentStatus: paymentStatus("payment_status").notNull().default("pending"),
     /** UPI / bank reference, or a note such as "cash collected". */
     paymentReference: text("payment_reference"),
+    /** Razorpay order created for paying this order online (order_…). */
+    gatewayOrderId: text("gateway_order_id"),
     paidAt: timestamp("paid_at", { withTimezone: true }),
     /** Sum of item prices (GST inclusive), shipping and total, fixed when the order is placed. */
     itemsTotalPaise: integer("items_total_paise").notNull(),
@@ -183,6 +185,7 @@ export const orders = pgTable(
   },
   (t) => [
     uniqueIndex("orders_seq_key").on(t.seq),
+    uniqueIndex("orders_gateway_order_key").on(t.gatewayOrderId).where(sql`${t.gatewayOrderId} is not null`),
     index("orders_user_id_idx").on(t.userId),
     index("orders_status_idx").on(t.status),
     index("orders_created_at_idx").on(t.createdAt),
@@ -278,6 +281,8 @@ export const products = pgTable(
     gstRateBp: integer("gst_rate_bp").notNull().default(1800),
     /** Units on the shelf that can still be sold. Placing an order takes units off; only inventory.ts changes it otherwise. */
     stock: integer("stock").notNull().default(0),
+    /** Customers may choose cash on delivery only when every item in the order allows it. */
+    codAvailable: boolean("cod_available").notNull().default(false),
     /** "Low stock" at or below this many units. */
     lowStockThreshold: integer("low_stock_threshold").notNull().default(2),
     isActive: boolean("is_active").notNull().default(true),
@@ -478,12 +483,22 @@ export const payments = pgTable(
     amountPaise: integer("amount_paise").notNull(),
     /** "manual" for staff-recorded; a gateway id (e.g. "razorpay") once one is connected. */
     provider: text("provider").notNull().default("manual"),
+    /** Gateway payment id (pay_…) or refund id (rfnd_…), or the staff-entered reference. */
     reference: text("reference"),
+    /** A gateway refund stays "pending" until the gateway confirms it. Staff-recorded rows are "succeeded". */
+    status: text("status").notNull().default("succeeded"),
     note: text("note"),
     recordedById: uuid("recorded_by_id").references(() => users.id, { onDelete: "set null" }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
-  (t) => [index("payments_order_idx").on(t.orderId), index("payments_created_idx").on(t.createdAt), check("payments_amount_positive", sql`${t.amountPaise} > 0`)],
+  (t) => [
+    index("payments_order_idx").on(t.orderId),
+    index("payments_created_idx").on(t.createdAt),
+    check("payments_amount_positive", sql`${t.amountPaise} > 0`),
+    check("payments_status", sql`${t.status} in ('pending', 'succeeded', 'failed')`),
+    // The same gateway payment or refund can never be recorded twice.
+    uniqueIndex("payments_gateway_reference_key").on(t.provider, t.kind, t.reference).where(sql`${t.provider} <> 'manual' and ${t.reference} is not null`),
+  ],
 );
 
 export const shipmentStatus = pgEnum("shipment_status", ["in_transit", "out_for_delivery", "delivered", "returned", "lost"]);
@@ -755,6 +770,30 @@ export type DeviceType = (typeof deviceType.enumValues)[number];
 export type ServicePriority = (typeof servicePriority.enumValues)[number];
 export type TransferStatus = (typeof transferStatus.enumValues)[number];
 export type ServiceNoteKind = (typeof serviceNoteKind.enumValues)[number];
+
+export const collectionMethod = pgEnum("collection_method", ["cash", "upi", "card", "bank_transfer"]);
+
+/**
+ * Money the shop collected from the customer for a service job (no online payment for services).
+ * Append-only: a mistake is corrected by an admin with a reversing entry.
+ */
+export const serviceCollections = pgTable(
+  "service_collections",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    requestId: uuid("request_id")
+      .notNull()
+      .references(() => serviceRequests.id, { onDelete: "restrict" }),
+    /** Negative only for an admin's correction. */
+    amountPaise: integer("amount_paise").notNull(),
+    method: collectionMethod("method").notNull(),
+    note: text("note"),
+    recordedById: uuid("recorded_by_id").references(() => users.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("service_collections_request_idx").on(t.requestId), index("service_collections_created_idx").on(t.createdAt), check("service_collections_amount_nonzero", sql`${t.amountPaise} <> 0`)],
+);
+export type CollectionMethod = (typeof collectionMethod.enumValues)[number];
 
 /** In-app messages for staff (assignments, transfer decisions, cancellations). No email is sent from these. */
 export const notifications = pgTable(

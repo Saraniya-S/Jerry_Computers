@@ -12,6 +12,7 @@ export type CartItem = {
   /** GST-inclusive unit price in paise. */
   pricePaise: number;
   stock: number;
+  codAvailable: boolean;
 };
 
 export const MAX_QUANTITY = 10;

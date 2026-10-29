@@ -89,8 +89,8 @@ async function Product({ params }: Pick<PageProps<"/products/[slug]">, "params">
             <Assurance icon={<FileText className="size-4" aria-hidden />} title="GST invoice" text="Emailed as a PDF once paid" />
             <Assurance
               icon={<Truck className="size-4" aria-hidden />}
-              title={store.codEnabled ? "Cash on delivery" : "Online payment"}
-              text={store.codEnabled ? "Or pay online by UPI or bank transfer" : "UPI or bank transfer"}
+              title={store.codEnabled && product.codAvailable ? "Cash on delivery" : "Pay online"}
+              text={store.codEnabled && product.codAvailable ? "Or pay online by UPI, card or net banking" : "UPI, card, net banking or wallet via Razorpay"}
             />
             <Assurance icon={<Wrench className="size-4" aria-hidden />} title="Service from us" text="Repairs and support at the same shop" />
             <Assurance icon={<ShieldCheck className="size-4" aria-hidden />} title="Genuine hardware" text="Sourced and checked by our team" />

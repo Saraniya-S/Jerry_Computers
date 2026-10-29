@@ -5,6 +5,7 @@ import { z } from "zod";
 import type { ActionResult } from "@/lib/admin/result";
 import { attempt } from "@/lib/server/admin/attempt";
 import { addServiceNote, changeServiceStatus, requestTransfer, setSchedule, withdrawTransfer } from "@/lib/server/admin/service-requests";
+import { recordCollection } from "@/lib/server/admin/collections";
 import { requireStaff } from "@/lib/server/auth";
 import type { ServiceNoteKind, ServiceStatus } from "@/lib/server/db/schema";
 
@@ -62,6 +63,17 @@ export async function withdrawTransferAction(transferId: string): Promise<Action
   const res = await attempt(async () => {
     await withdrawTransfer(me.id, id.parse(transferId));
     return "Transfer request withdrawn.";
+  });
+  if (res.ok) refresh();
+  return res;
+}
+
+/** Records money the engineer collected from the customer for their own job. */
+export async function engineerCollectionAction(input: { requestId: string; amount: string; method: string; note: string; correction: boolean }): Promise<ActionResult> {
+  const me = await requireEngineer();
+  const res = await attempt(async () => {
+    await recordCollection(me, { ...(input as Parameters<typeof recordCollection>[1]), correction: false });
+    return "Payment recorded.";
   });
   if (res.ok) refresh();
   return res;

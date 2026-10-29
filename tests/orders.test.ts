@@ -16,30 +16,35 @@ describe("payments", () => {
     customer = await makeUser("customer");
   });
 
-  it("won't mark an online payment paid without the transaction reference staff checked", async () => {
+  it("never lets staff mark an online payment paid by hand", async () => {
     const o = await makeOrder(customer.id, await makeProduct(), { paymentMethod: "online" });
-    await expect(recordPayment(o.id, "  ", staff.id)).rejects.toThrow(/transaction ID/);
+    await expect(recordPayment(o.id, "UPI-123", staff.id)).rejects.toThrow(/automatically once Razorpay/);
+    await expect(recordPayment(o.id, "  ", null, { provider: "razorpay" })).rejects.toThrow(/Razorpay payment id/);
     const [still] = await db.select().from(schema.orders).where(eq(schema.orders.id, o.id));
     expect(still.paymentStatus).toBe("pending");
     // Online orders can be confirmed, but not packed or shipped until paid.
     await updateOrderStatus(o.id, "confirmed", staff.id);
-    await expect(updateOrderStatus(o.id, "packed", staff.id)).rejects.toThrow(/Record the online payment/);
+    await expect(updateOrderStatus(o.id, "packed", staff.id)).rejects.toThrow(/Wait for the online payment/);
   });
 
   it("records a payment row with the invoice, once", async () => {
     const o = await makeOrder(customer.id, await makeProduct(), { paymentMethod: "online" });
-    await recordPayment(o.id, "UPI-998877", staff.id);
-    await expect(recordPayment(o.id, "UPI-998877", staff.id)).rejects.toThrow(/already recorded/);
+    await recordPayment(o.id, "pay_998877", null, { provider: "razorpay" });
+    await expect(recordPayment(o.id, "pay_998877", null, { provider: "razorpay" })).rejects.toThrow(/already recorded/);
     const full = await getOrder(o.id);
     expect(full?.paymentStatus).toBe("paid");
-    expect(full?.payments).toMatchObject([{ kind: "payment", amountPaise: o.totalPaise, reference: "UPI-998877", recordedById: staff.id }]);
+    expect(full?.payments).toMatchObject([{ kind: "payment", amountPaise: o.totalPaise, reference: "pay_998877", provider: "razorpay", status: "succeeded", recordedById: null }]);
     expect(full?.invoice).not.toBeNull();
   });
 
   it("cancelling a paid order makes a refund due, returns stock, and the refund closes it", async () => {
     const p = await makeProduct({ stock: 4 });
-    const o = await makeOrder(customer.id, p, { paymentMethod: "online" });
-    await recordPayment(o.id, "UPI-1", staff.id);
+    // A cash-on-delivery order paid and then cancelled; cash refunds are recorded by hand.
+    const o = await makeOrder(customer.id, p);
+    await updateOrderStatus(o.id, "confirmed", staff.id);
+    await updateOrderStatus(o.id, "packed", staff.id);
+    await db.insert(schema.payments).values({ orderId: o.id, kind: "payment", method: "cod", amountPaise: o.totalPaise, reference: "cash" });
+    await db.update(schema.orders).set({ paymentStatus: "paid" }).where(eq(schema.orders.id, o.id));
     await expect(updateOrderStatus(o.id, "cancelled", staff.id)).rejects.toThrow(/why/);
     await updateOrderStatus(o.id, "cancelled", staff.id, { cancelReason: "Customer changed mind" });
     let full = await getOrder(o.id);

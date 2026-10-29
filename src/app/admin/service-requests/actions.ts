@@ -9,6 +9,7 @@ import { attempt } from "@/lib/server/admin/attempt";
 import { engineerProfileInput, updateEngineerProfile } from "@/lib/server/admin/engineers";
 import { addServiceNote, changeServiceStatus, createServiceRequest, decideTransfer, overrideAssignment, setSchedule, type statusChangeInput } from "@/lib/server/admin/service-requests";
 import { markRead } from "@/lib/server/notifications";
+import { recordCollection } from "@/lib/server/admin/collections";
 import { db, schema } from "@/lib/server/db";
 import { requirePermission } from "@/lib/server/permissions";
 import type { ServiceRequestInput } from "@/lib/service-desk";
@@ -113,4 +114,14 @@ export async function markAdminNotificationsReadAction(ids?: string[]): Promise<
   await markRead(admin.id, ids ? z.array(id).max(100).parse(ids) : undefined);
   refresh();
   return { ok: true, message: "Marked as read." };
+}
+
+export async function recordCollectionAction(input: { requestId: string; amount: string; method: string; note: string; correction: boolean }): Promise<ActionResult> {
+  const admin = await requirePermission("service.manage");
+  const res = await attempt(async () => {
+    await recordCollection(admin, input as Parameters<typeof recordCollection>[1]);
+    return input.correction ? "Correction recorded." : "Payment recorded.";
+  });
+  if (res.ok) refresh();
+  return res;
 }

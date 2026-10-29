@@ -7,7 +7,7 @@ import { formatPaise, orderStatusLabel } from "@/lib/money";
 import { inventoryReport, salesReport, serviceReport } from "@/lib/server/admin/reports";
 import type { InventoryReason } from "@/lib/server/db/schema";
 import { requirePermission } from "@/lib/server/permissions";
-import { deviceTypeLabel, serviceStatusLabel } from "@/lib/service-desk";
+import { collectionMethodLabel, deviceTypeLabel, serviceStatusLabel } from "@/lib/service-desk";
 
 export const metadata: Metadata = { title: "Reports" };
 
@@ -151,6 +151,17 @@ async function Reports({ searchParams }: Pick<PageProps<"/admin/reports">, "sear
               <Cell label="Created in the period" value={service.created} />
               <Cell label="Completed in the period" value={service.completed.n} />
               <Cell label="Average time to complete" value={service.completed.avgHours === null ? "—" : `${service.completed.avgHours} h`} />
+            </div>
+            <div className="grid grid-cols-1 gap-px border-t border-line bg-line text-sm">
+              <Cell
+                label="Collected from customers for service jobs"
+                value={formatPaise(service.collected.total)}
+                sub={
+                  service.collected.byMethod.length
+                    ? `${service.collected.jobs} job${service.collected.jobs === 1 ? "" : "s"} · ${service.collected.byMethod.map((m) => `${collectionMethodLabel[m.method]} ${formatPaise(m.total)}`).join(" · ")}`
+                    : "Nothing recorded in this period"
+                }
+              />
             </div>
             <Table columns={["Status (of jobs created)", "Jobs"]} minWidth={300}>
               {service.byStatus.length ? (

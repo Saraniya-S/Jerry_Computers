@@ -14,21 +14,25 @@ type Address = { id: string; label: string; isDefault: boolean; recipientName: s
 
 const payments = [
   { id: "cod", label: "Cash on delivery", text: "Pay the courier when your order arrives.", icon: Banknote },
-  { id: "online", label: "Online payment", text: "Pay by UPI or bank transfer; the shop shares the details.", icon: CreditCard },
+  { id: "online", label: "Pay online", text: "UPI, cards, net banking or wallets, securely through Razorpay.", icon: CreditCard },
 ] as const;
 
-export function CheckoutForm({ items, addresses, store }: { items: CartItem[]; addresses: Address[]; store: StoreSettings }) {
+export function CheckoutForm({ items, addresses, store, onlineAvailable }: { items: CartItem[]; addresses: Address[]; store: StoreSettings; onlineAvailable: boolean }) {
   const [state, action] = useActionState(placeOrderAction, {});
   const [addressId, setAddressId] = useState(addresses.find((a) => a.isDefault)?.id ?? addresses[0]?.id ?? "");
-  const [payment, setPayment] = useState<"cod" | "online">(store.codEnabled ? "cod" : "online");
+  // Cash on delivery only when the store allows it and every item in the cart does.
+  const noCod = items.filter((i) => !i.codAvailable);
+  const codAllowed = store.codEnabled && noCod.length === 0;
+  const options = payments.filter((p) => (p.id === "cod" ? codAllowed : onlineAvailable));
+  const [payment, setPayment] = useState<"cod" | "online">(onlineAvailable ? "online" : "cod");
   const count = items.reduce((n, i) => n + i.quantity, 0);
   const itemsTotal = cartTotal(items);
-  const shipping = shippingFor(itemsTotal, store);
+  const shipping = shippingFor(store);
 
   return (
     <form action={action} className="mt-8 grid gap-8 lg:grid-cols-[1fr_360px]">
       <input type="hidden" name="addressId" value={addressId} />
-      <input type="hidden" name="paymentMethod" value={payment} />
+      <input type="hidden" name="paymentMethod" value={options.some((o) => o.id === payment) ? payment : (options[0]?.id ?? "")} />
 
       <div className="grid content-start gap-8">
         <Section step={1} title="Delivery address">
@@ -64,15 +68,24 @@ export function CheckoutForm({ items, addresses, store }: { items: CartItem[]; a
         </Section>
 
         <Section step={2} title="Payment">
-          <div className="grid gap-3 sm:grid-cols-2" role="radiogroup" aria-label="Payment method">
-            {payments.filter((p) => p.id !== "cod" || store.codEnabled).map((p) => (
-              <Choice key={p.id} on={payment === p.id} onSelect={() => setPayment(p.id)}>
-                <p.icon className="size-5 text-brand" aria-hidden />
-                <span className="mt-2 block text-sm font-medium text-fg">{p.label}</span>
-                <span className="mt-0.5 block text-sm text-fg-muted">{p.text}</span>
-              </Choice>
-            ))}
-          </div>
+          {options.length ? (
+            <div className="grid gap-3 sm:grid-cols-2" role="radiogroup" aria-label="Payment method">
+              {options.map((p) => (
+                <Choice key={p.id} on={payment === p.id} onSelect={() => setPayment(p.id)}>
+                  <p.icon className="size-5 text-brand" aria-hidden />
+                  <span className="mt-2 block text-sm font-medium text-fg">{p.label}</span>
+                  <span className="mt-0.5 block text-sm text-fg-muted">{p.text}</span>
+                </Choice>
+              ))}
+            </div>
+          ) : (
+            <FormAlert tone="error">Payment isn&apos;t available for these items right now. Please contact the shop to order.</FormAlert>
+          )}
+          {store.codEnabled && noCod.length > 0 && onlineAvailable && (
+            <p className="mt-3 text-[0.8rem] text-fg-muted">
+              Cash on delivery isn&apos;t available for {noCod.length === 1 ? noCod[0].name : `${noCod.length} items in your cart`}, so this order is paid online.
+            </p>
+          )}
         </Section>
 
         <Section step={3} title="Note for the shop" optional>
@@ -119,7 +132,7 @@ export function CheckoutForm({ items, addresses, store }: { items: CartItem[]; a
           </div>
           <div className="flex justify-between text-fg-muted">
             <dt>Delivery</dt>
-            <dd className="tabular-nums text-fg">{shipping ? formatPrice(shipping) : "Free"}</dd>
+            <dd className="tabular-nums text-fg">{formatPrice(shipping)}</dd>
           </div>
           <div className="mt-1 flex justify-between border-t border-line pt-2.5 text-base font-semibold text-fg">
             <dt>Total</dt>
@@ -132,8 +145,8 @@ export function CheckoutForm({ items, addresses, store }: { items: CartItem[]; a
             <FormAlert>{state.error}</FormAlert>
           </div>
         )}
-        {addresses.length > 0 ? (
-          <SubmitButton pendingLabel="Placing order…">Place order</SubmitButton>
+        {addresses.length > 0 && options.length > 0 ? (
+          <SubmitButton pendingLabel="Placing order…">{payment === "online" ? "Place order and pay" : "Place order"}</SubmitButton>
         ) : (
           <p className="mt-4 text-center text-sm text-fg-dim">Add a delivery address to place your order.</p>
         )}

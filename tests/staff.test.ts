@@ -19,7 +19,7 @@ describe("e-commerce staff order workflow", () => {
   });
 
   it("places an order from the cart, takes stock with a movement and tells staff", async () => {
-    const p = await makeProduct({ stock: 5 });
+    const p = await makeProduct({ stock: 5, codAvailable: true });
     const [addr] = await db
       .insert(schema.addresses)
       .values({ userId: customer.id, label: "Home", recipientName: "C", phone: "+91 98765 43210", line1: "1 Street", city: "Chennai", state: "Tamil Nadu", postalCode: "600001" })
@@ -73,7 +73,7 @@ describe("e-commerce staff order workflow", () => {
     const admin = await makeUser("admin");
     const p = await makeProduct({ stock: 3 });
     const o = await makeOrder(customer.id, p, { paymentMethod: "online" });
-    await recordPayment(o.id, "UPI-77", staff.id);
+    await recordPayment(o.id, "pay_77", null, { provider: "razorpay" });
     await updateOrderStatus(o.id, "confirmed", staff.id);
     await updateOrderStatus(o.id, "packed", staff.id);
     await updateOrderStatus(o.id, "shipped", staff.id, { shipment: ship() });

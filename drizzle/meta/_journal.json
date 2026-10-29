@@ -71,6 +71,13 @@
       "when": 1793292635506,
       "tag": "0009_online_service_requests",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1793297725852,
+      "tag": "0010_razorpay_cod_collections",
+      "breakpoints": true
     }
   ]
 }

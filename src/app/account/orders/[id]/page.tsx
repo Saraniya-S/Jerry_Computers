@@ -5,7 +5,8 @@ import { ArrowLeft, CircleCheck, Truck } from "lucide-react";
 import { Suspense } from "react";
 import { PageHeader, PageSkeleton } from "@/components/account/PageHeader";
 import { AddressBlock, InvoiceCard, OrderLines, PaymentBadge, StatusBadge } from "@/components/orders/OrderParts";
-import { orderNumber, paymentLabel } from "@/lib/money";
+import { PayNow } from "@/components/orders/PayNow";
+import { formatPaise, orderNumber, paymentLabel } from "@/lib/money";
 import { requireCustomer } from "@/lib/server/auth";
 import { getCustomerOrder } from "@/lib/server/orders";
 
@@ -23,7 +24,7 @@ export default function OrderPage({ params, searchParams }: PageProps<"/account/
 
 async function Order({ params, searchParams }: Pick<PageProps<"/account/orders/[id]">, "params" | "searchParams">) {
   const viewer = await requireCustomer();
-  const [{ id }, { placed }] = await Promise.all([params, searchParams]);
+  const [{ id }, { placed, pay }] = await Promise.all([params, searchParams]);
   const order = /^[0-9a-f-]{36}$/i.test(id) ? await getCustomerOrder(viewer.id, id) : null;
   if (!order) notFound();
 
@@ -49,19 +50,20 @@ async function Order({ params, searchParams }: Pick<PageProps<"/account/orders/[
               <CircleCheck className="mt-0.5 size-5 shrink-0" aria-hidden />
               <div>
                 <p className="font-medium">Order placed — thank you!</p>
-                <p className="mt-0.5 text-leaf/80">We&apos;ve sent updates to {viewer.email}. Your GST invoice follows once payment is received.</p>
+                <p className="mt-0.5 text-leaf/80">
+                  {order.paymentMethod === "online" && order.paymentStatus === "pending" ? "Complete the payment below to confirm it." : `We'll send updates to ${viewer.email}. Your GST invoice follows once payment is received.`}
+                </p>
               </div>
             </div>
           )}
           {order.invoice ? (
             <InvoiceCard invoice={order.invoice} href={`/account/orders/${order.id}/invoice`} />
+          ) : order.paymentMethod === "online" && order.paymentStatus === "pending" && order.status !== "cancelled" && order.status !== "returned" ? (
+            <PayNow orderId={order.id} amountLabel={formatPaise(order.totalPaise)} autoStart={pay === "1"} />
           ) : (
-            order.status !== "cancelled" && (
-              <div className="rounded-xl border border-line bg-ink-950 px-4 py-3 text-sm text-fg-muted">
-                {order.paymentMethod === "cod"
-                  ? "Pay the courier on delivery. Your GST invoice is emailed as a PDF once payment is received."
-                  : "The shop will contact you with payment details. Your GST invoice is emailed as a PDF once payment is received."}
-              </div>
+            order.status !== "cancelled" &&
+            order.paymentMethod === "cod" && (
+              <div className="rounded-xl border border-line bg-ink-950 px-4 py-3 text-sm text-fg-muted">Pay the courier on delivery. Your GST invoice is emailed as a PDF once payment is received.</div>
             )
           )}
           <OrderLines items={order.items} itemsTotal={order.itemsTotalPaise} shipping={order.shippingPaise} total={order.totalPaise} />

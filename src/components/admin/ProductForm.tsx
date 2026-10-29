@@ -39,6 +39,7 @@ export const emptyProduct: ProductFormValue = {
   lowStockThreshold: 2,
   isActive: true,
   isFeatured: false,
+  codAvailable: false,
   artVariant: 0,
 };
 
@@ -258,6 +259,7 @@ export function ProductForm({ id, initial, options, archived = false }: { id: st
             <ToggleCard title="Show in the store" description="Hidden products can't be found or bought." checked={v.isActive} onChange={(x) => set("isActive", x)} />
           )}
           <ToggleCard title="Featured" description="Highlighted first in the catalogue." checked={v.isFeatured} onChange={(x) => set("isFeatured", x)} />
+          <ToggleCard title="Cash on delivery" description="Allow paying on delivery for this product. Orders with any item without it are paid online." checked={v.codAvailable} onChange={(x) => set("codAvailable", x)} />
           <ChipGroup label="Good for" options={productUses.map((u) => ({ value: u.id, label: u.label }))} value={v.uses} onChange={(uses) => set("uses", uses)} />
         </Card>
 

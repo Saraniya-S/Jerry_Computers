@@ -23,15 +23,12 @@ export async function saveShopAction(input: unknown): Promise<SettingsResult> {
   return saved("Shop details saved. They now show on the site and on new invoices.");
 }
 
-export async function saveStoreAction(input: { shipping: string; freeAbove: string; codEnabled: boolean }): Promise<SettingsResult> {
+export async function saveStoreAction(input: { shipping: string; codEnabled: boolean }): Promise<SettingsResult> {
   const me = await requireStaff(["admin"]);
-  const shipping = input.shipping.trim() ? parseRupees(input.shipping) : 0;
-  const freeAbove = input.freeAbove.trim() ? parseRupees(input.freeAbove) : 0;
-  const errs: Record<string, string> = {};
-  if (shipping === null) errs.shipping = "Enter an amount in rupees.";
-  if (freeAbove === null) errs.freeAbove = "Enter an amount in rupees.";
-  if (Object.keys(errs).length) return { ok: false, error: "Check the highlighted fields.", fieldErrors: errs };
-  const parsed = storeSchema.safeParse({ shippingPaise: shipping, freeShippingAbovePaise: freeAbove, codEnabled: input.codEnabled });
+  // Every order carries the delivery charge, so it has to be set.
+  const shipping = parseRupees(input.shipping.trim());
+  if (!shipping) return { ok: false, error: "Check the highlighted fields.", fieldErrors: { shipping: "Enter the delivery charge in rupees; it's added to every order." } };
+  const parsed = storeSchema.safeParse({ shippingPaise: shipping, codEnabled: input.codEnabled });
   if (!parsed.success) return { ok: false, error: "Those amounts are out of range." };
   await saveSettings("store", parsed.data, me.id);
   return saved("Checkout settings saved.");

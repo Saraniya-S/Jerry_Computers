@@ -129,7 +129,7 @@ export function ShopForm({ initial }: { initial: ShopSettings }) {
   );
 }
 
-export function StoreForm({ initial }: { initial: { shipping: string; freeAbove: string; codEnabled: boolean } }) {
+export function StoreForm({ initial }: { initial: { shipping: string; codEnabled: boolean } }) {
   const [v, setV] = useState(initial);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const { result, pending, save } = useSave();
@@ -147,10 +147,14 @@ export function StoreForm({ initial }: { initial: { shipping: string; freeAbove:
     >
       <Section title="Checkout" text="Applies to new orders.">
         <div className="grid gap-4 sm:grid-cols-2">
-          <TextField label="Delivery charge" prefix="₹" inputMode="decimal" value={v.shipping} error={errors.shipping} onChange={(e) => setV({ ...v, shipping: e.target.value })} hint="Leave empty for free delivery." />
-          <TextField label="Free delivery from" optional prefix="₹" inputMode="decimal" value={v.freeAbove} error={errors.freeAbove} onChange={(e) => setV({ ...v, freeAbove: e.target.value })} hint="Order total at which delivery is free." />
+          <TextField label="Delivery charge" prefix="₹" inputMode="decimal" value={v.shipping} error={errors.shipping} onChange={(e) => setV({ ...v, shipping: e.target.value })} hint="Added to every order." />
         </div>
-        <ToggleCard title="Cash on delivery" description="Let customers pay the courier when the order arrives." checked={v.codEnabled} onChange={(codEnabled) => setV({ ...v, codEnabled })} />
+        <ToggleCard
+          title="Cash on delivery"
+          description="Master switch. COD is offered only when every item in the cart allows it (set on each product)."
+          checked={v.codEnabled}
+          onChange={(codEnabled) => setV({ ...v, codEnabled })}
+        />
       </Section>
       <div className="pb-6">
         <SaveBar pending={pending} result={result} label="Save checkout settings" />

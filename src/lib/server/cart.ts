@@ -33,6 +33,7 @@ export async function getCart(userId: string): Promise<CartItem[]> {
         image: p.images[0] ?? null,
         pricePaise: p.pricePaise!,
         stock: p.stock,
+        codAvailable: p.codAvailable,
       },
     ];
   });

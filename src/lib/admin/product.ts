@@ -68,6 +68,7 @@ export const productInput = z
     lowStockThreshold: z.number().int("Use a whole number.").min(0, "Can't be negative.").max(10_000),
     isActive: z.boolean(),
     isFeatured: z.boolean(),
+    codAvailable: z.boolean(),
     artVariant: z.number().int().min(0).max(2),
   })
   .superRefine((v, ctx) => {

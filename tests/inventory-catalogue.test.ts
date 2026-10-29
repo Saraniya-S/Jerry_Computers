@@ -24,6 +24,7 @@ const product = (overrides: Record<string, unknown> = {}) => ({
   lowStockThreshold: 2,
   isActive: true,
   isFeatured: false,
+  codAvailable: false,
   artVariant: 0,
   ...overrides,
 });

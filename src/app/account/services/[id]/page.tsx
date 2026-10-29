@@ -6,8 +6,10 @@ import { Suspense } from "react";
 import { PageHeader, PageSkeleton } from "@/components/account/PageHeader";
 import { requireCustomer } from "@/lib/server/auth";
 import { getMyServiceRequest } from "@/lib/server/customer-service-requests";
+import { formatPaise } from "@/lib/money";
+import { listCollections } from "@/lib/server/admin/collections";
 import { getSettings } from "@/lib/server/settings";
-import { deviceTypeLabel, serviceNumber } from "@/lib/service-desk";
+import { collectionMethodLabel, deviceTypeLabel, serviceNumber } from "@/lib/service-desk";
 import { customerStatusLabel, preferredLabel } from "@/lib/service-request-form";
 
 export const metadata: Metadata = { title: "Service request" };
@@ -29,7 +31,7 @@ async function Request({ params }: Pick<PageProps<"/account/services/[id]">, "pa
   const job = /^[0-9a-f-]{36}$/i.test(id) ? await getMyServiceRequest(viewer.id, id) : null;
   if (!job) notFound();
   const r = job.r;
-  const shop = r.location === "in_shop" ? await getSettings("shop") : null;
+  const [shop, paid] = await Promise.all([r.location === "in_shop" ? getSettings("shop") : null, listCollections(r.id)]);
   const a = r.serviceAddress;
   const status = customerStatusLabel[r.status];
 
@@ -93,6 +95,26 @@ async function Request({ params }: Pick<PageProps<"/account/services/[id]">, "pa
             {r.preferredDate && <p className="text-xs text-fg-dim">You asked for {preferredLabel(r.preferredDate, r.preferredWindow)}.</p>}
             <p className="text-fg-muted">{job.engineerFirst ? `Engineer: ${job.engineerFirst}` : r.status === "cancelled" || r.status === "completed" ? "" : "An engineer is being assigned."}</p>
           </section>
+          {paid.rows.length > 0 && (
+            <section className="grid gap-2 rounded-xl border border-line p-4 text-sm">
+              <h2 className="flex items-center justify-between font-medium text-fg">
+                Paid to the shop <span className="tabular-nums">{formatPaise(paid.totalPaise)}</span>
+              </h2>
+              <ul className="grid gap-1 text-fg-muted">
+                {paid.rows.map((p) => (
+                  <li key={p.id} className="flex justify-between gap-3">
+                    <span>
+                      {collectionMethodLabel[p.method]} · {fmt.format(p.createdAt)}
+                    </span>
+                    <span className="tabular-nums">
+                      {p.amountPaise < 0 ? "−" : ""}
+                      {formatPaise(Math.abs(p.amountPaise))}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
           <section className="rounded-xl border border-line p-4 text-sm">
             <h2 className="mb-2 flex items-center gap-1.5 font-medium text-fg">
               {r.location === "on_site" ? <MapPin className="size-4 text-brand" aria-hidden /> : <Store className="size-4 text-brand" aria-hidden />}

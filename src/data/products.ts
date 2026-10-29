@@ -55,6 +55,8 @@ export type Product = {
   gstRateBp: number;
   stock: number;
   isFeatured: boolean;
+  /** Can be paid for on delivery (when cash on delivery is on for the store). */
+  codAvailable: boolean;
 };
 
 /** Can be added to the cart: priced and in stock. */

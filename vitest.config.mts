@@ -25,6 +25,10 @@ export default defineConfig({
       SMTP_HOST: "localhost",
       SMTP_PORT: "1025",
       MAIL_FROM: "test@example.com",
+      // Fake Razorpay credentials; tests replace fetch with an in-memory Razorpay.
+      RAZORPAY_KEY_ID: "rzp_test_fake",
+      RAZORPAY_KEY_SECRET: "test_key_secret",
+      RAZORPAY_WEBHOOK_SECRET: "test_webhook_secret",
     },
     setupFiles: ["tests/setup.ts"],
   },

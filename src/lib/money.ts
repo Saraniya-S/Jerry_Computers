@@ -28,4 +28,4 @@ export const orderStatusLabel: Record<string, string> = {
 
 export const paymentStatusLabel: Record<string, string> = { pending: "Payment pending", paid: "Paid", refund_pending: "Refund due", refunded: "Refunded" };
 
-export const paymentLabel: Record<string, string> = { cod: "Cash on delivery", online: "Online payment" };
+export const paymentLabel: Record<string, string> = { cod: "Cash on delivery", online: "Online (Razorpay)" };

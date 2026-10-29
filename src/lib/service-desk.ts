@@ -95,6 +95,9 @@ export const noteKindLabel: Record<ServiceNoteKind, string> = {
 /** Kinds an engineer can add as a work report entry (completion is written by completing the job). */
 export const reportKinds = ["inspection", "diagnosis", "work_done", "parts_used", "parts_required", "customer_feedback", "follow_up", "note"] as const satisfies readonly ServiceNoteKind[];
 
+export const collectionMethodLabel = { cash: "Cash", upi: "UPI", card: "Card", bank_transfer: "Bank transfer" } as const;
+export type CollectionMethodId = keyof typeof collectionMethodLabel;
+
 export const serviceNumber = (seq: number) => `SR-${String(seq).padStart(6, "0")}`;
 
 const optional = (max: number) =>

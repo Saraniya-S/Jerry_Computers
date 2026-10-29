@@ -30,5 +30,6 @@ export async function placeOrderAction(_: { error?: string }, formData: FormData
     if (err instanceof OrderError) return { error: err.message };
     throw err;
   }
-  redirect(`/account/orders/${orderId}?placed=1`);
+  // Online orders go straight to Razorpay on the order page.
+  redirect(`/account/orders/${orderId}?placed=1${parsed.data.paymentMethod === "online" ? "&pay=1" : ""}`);
 }

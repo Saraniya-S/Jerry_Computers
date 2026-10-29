@@ -134,6 +134,7 @@ async function Products({ searchParams }: Pick<PageProps<"/admin/products">, "se
                     <span className="flex gap-1.5">
                       {row.archivedAt ? <Badge tone="muted">Archived</Badge> : row.isActive ? <Badge tone="good">Live</Badge> : <Badge tone="muted">Hidden</Badge>}
                       {row.isFeatured && <Badge tone="brand">Featured</Badge>}
+                      {row.codAvailable && <Badge tone="info">COD</Badge>}
                     </span>
                   </td>
                 </tr>

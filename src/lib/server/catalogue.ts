@@ -26,6 +26,7 @@ export function toProduct(r: ProductRow): Product {
     gstRateBp: r.gstRateBp,
     stock: r.stock,
     isFeatured: r.isFeatured,
+    codAvailable: r.codAvailable,
   };
 }
 

@@ -87,6 +87,7 @@ async function EditProduct({ params, searchParams }: Pick<PageProps<"/admin/prod
           lowStockThreshold: p.lowStockThreshold,
           isActive: p.isActive,
           isFeatured: p.isFeatured,
+          codAvailable: p.codAvailable,
           artVariant: p.artVariant,
         }}
       />
