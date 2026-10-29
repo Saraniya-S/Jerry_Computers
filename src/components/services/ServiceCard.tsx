@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { ArrowUpRight } from "lucide-react";
-import type { Service } from "@/data/services";
+import { serviceRequestHref, type Service } from "@/data/services";
 import { ServiceVisual } from "./ServiceVisual";
 
 /** `compact` trims vertical space so the orbiting grid fits laptop-height windows without shrinking. */
@@ -19,10 +19,10 @@ export function ServiceCard({ service, compact = false }: { service: Service; co
       <h3 className={`${compact ? "mt-3.5" : "mt-5"} text-[1.05rem] font-medium leading-snug tracking-tight text-fg`}>{service.title}</h3>
       <p className={`mt-1.5 flex-1 text-sm leading-relaxed text-fg-muted ${compact ? "line-clamp-2" : ""}`}>{service.description}</p>
       <Link
-        href={`/services/${service.slug}`}
+        href={serviceRequestHref(service.slug)}
         className={`${compact ? "mt-3" : "mt-5"} inline-flex items-center gap-1.5 self-start text-sm font-medium text-fg transition-colors after:absolute after:inset-0 after:rounded-2xl hover:text-brand`}
       >
-        View service <ArrowUpRight className="size-4 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" aria-hidden />
+        Request this service <ArrowUpRight className="size-4 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" aria-hidden />
       </Link>
     </article>
   );

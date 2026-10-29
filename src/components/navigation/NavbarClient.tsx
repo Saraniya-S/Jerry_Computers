@@ -6,7 +6,7 @@ import { ChevronDown } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { navLinks } from "@/config/site";
 import { productCategories } from "@/data/products";
-import type { Service } from "@/data/services";
+import { serviceRequestHref, type Service } from "@/data/services";
 import { ProductArt } from "@/components/products/ProductArt";
 import { ServiceVisual } from "@/components/services/ServiceVisual";
 import { AccountNav } from "@/components/session/AccountNav";
@@ -26,7 +26,7 @@ const buildMenus = (services: Service[]): Menus => ({
     items: services.slice(0, 4).map((s) => ({
       title: s.label === "Support" ? "Diagnostics" : s.label,
       description: s.description,
-      href: `/services/${s.slug}`,
+      href: serviceRequestHref(s.slug),
       visual: (
         <div className="absolute inset-0 flex items-center px-5">
           <div className="w-full">
@@ -37,7 +37,7 @@ const buildMenus = (services: Service[]): Menus => ({
     })),
     footer: [
       { label: "All services", href: "/#services" },
-      ...services.slice(4).map((s) => ({ label: s.label, href: `/services/${s.slug}` })),
+      ...services.slice(4).map((s) => ({ label: s.label, href: serviceRequestHref(s.slug) })),
       { label: "Request a service", href: "/services/request" },
     ],
   },

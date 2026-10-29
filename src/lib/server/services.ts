@@ -27,7 +27,3 @@ export async function getServices(): Promise<Service[]> {
     visual: (serviceVisuals.some((v) => v.id === r.visual) ? r.visual : "diagnostics") as ServiceId,
   }));
 }
-
-export async function getServiceBySlug(slug: string) {
-  return (await getServices()).find((s) => s.slug === slug) ?? null;
-}

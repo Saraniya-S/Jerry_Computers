@@ -11,6 +11,9 @@ export const serviceVisuals: { id: ServiceId; label: string }[] = [
 ];
 
 /** A service as shown on the site. Stored in the database and edited in Admin → Services. */
+/** Services don't have pages of their own: links open the request form with the service chosen. */
+export const serviceRequestHref = (slug: string) => `/services/request?service=${encodeURIComponent(slug)}`;
+
 export type Service = {
   id: string;
   slug: string;

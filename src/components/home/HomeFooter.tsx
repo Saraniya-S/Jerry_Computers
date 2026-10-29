@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { navLinks, policyLinks, site, telHref } from "@/config/site";
 import { productCategories } from "@/data/products";
+import { serviceRequestHref } from "@/data/services";
 import { getServices } from "@/lib/server/services";
 import { getSettings } from "@/lib/server/settings";
 import { shopContact } from "@/lib/settings";
@@ -12,7 +13,7 @@ export async function HomeFooter() {
   const columns = [
     { title: "Navigate", links: navLinks.map((l) => ({ label: l.label, href: l.href })) },
     { title: "Products", links: productCategories.map((p) => ({ label: p.label, href: `/products?category=${p.id}` })) },
-    { title: "Services", links: services.map((s) => ({ label: s.title.replace(/ and .*/, ""), href: `/services/${s.slug}` })) },
+    { title: "Services", links: services.map((s) => ({ label: s.title.replace(/ and .*/, ""), href: serviceRequestHref(s.slug) })) },
   ];
 
   return (

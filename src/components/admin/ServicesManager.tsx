@@ -55,7 +55,7 @@ export function ServicesManager({ services }: { services: Row[] }) {
               </p>
               <p className="mt-1 text-sm text-fg-muted">{s.description}</p>
               <p className="mt-2 text-xs text-fg-dim">
-                {s.label} · /services/{s.slug} · {s.includes.length} items included
+                {s.label} · /services/request?service={s.slug} · {s.includes.length} items included
               </p>
             </div>
             <div className="flex items-start gap-1.5">
@@ -160,8 +160,8 @@ function ServiceDialog({ id, initial, onClose, onSaved }: { id: string | null; i
           <div className="grid gap-4 sm:grid-cols-2">
             <TextField label="Short name" value={v.label} error={errors.label} onChange={(e) => setV({ ...v, label: e.target.value })} hint="Used in menus, e.g. “Laptops”." />
             <TextField
-              label="Web address"
-              prefix="/services/"
+              label="Link key"
+              prefix="?service="
               value={v.slug}
               error={errors.slug}
               onChange={(e) => {
