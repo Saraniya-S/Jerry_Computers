@@ -63,7 +63,17 @@ export async function HomeFooter() {
             <p className="font-mono text-[0.65rem] uppercase tracking-[0.18em] text-fg-dim">Contact</p>
             <ul className="mt-5 space-y-2.5 text-sm text-fg-muted">
               <li>{c.address ?? "Address to be confirmed"}</li>
-              <li>{c.phone ? <a href={telHref(c.phone)} className="hover:text-fg">{c.phone}</a> : "Phone to be confirmed"}</li>
+              {c.phones.length ? (
+                c.phones.map((p) => (
+                  <li key={p}>
+                    <a href={telHref(p)} className="hover:text-fg">
+                      {p}
+                    </a>
+                  </li>
+                ))
+              ) : (
+                <li>{c.phone ?? "Phone to be confirmed"}</li>
+              )}
               <li>{c.email ? <a href={`mailto:${c.email}`} className="hover:text-fg">{c.email}</a> : "Email to be confirmed"}</li>
             </ul>
           </div>

@@ -23,6 +23,7 @@ import {
 import { createElement, useState, type ReactNode } from "react";
 import { AddressFields, type AddressDraft } from "@/components/forms/AddressFields";
 import { SelectField, TextField } from "@/components/forms/controls";
+import { phoneNumbers, telHref } from "@/config/site";
 import { inServiceArea, ROUGH_FIX_METRES, SERVICE_AREA, visitAreaText, type VisitArea } from "@/lib/service-location";
 import { istDay, PREFERENCE_DAYS, preferredWindows } from "@/lib/service-request-form";
 import type { SubmittedRequest } from "@/lib/server/customer-service-requests";
@@ -434,11 +435,11 @@ export function MethodStep({ draft, set, errors, account, shop, visitArea }: { d
                 )}
               </address>
               <div className="grid content-start gap-1 text-fg-muted">
-                {shop.phone && (
-                  <a href={`tel:${shop.phone.replace(/\s/g, "")}`} className="inline-flex items-center gap-1.5 hover:text-brand">
-                    <Phone className="size-3.5" aria-hidden /> {shop.phone}
+                {phoneNumbers(shop.phone).map((p) => (
+                  <a key={p} href={telHref(p)} className="inline-flex items-center gap-1.5 hover:text-brand">
+                    <Phone className="size-3.5" aria-hidden /> {p}
                   </a>
-                )}
+                ))}
                 {shop.hours.map((h) => (
                   <span key={h.days} className="inline-flex items-center gap-1.5">
                     <Clock className="size-3.5" aria-hidden /> {h.days}: {h.hours}

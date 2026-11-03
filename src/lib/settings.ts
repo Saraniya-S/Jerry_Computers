@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { phoneNumbers } from "@/config/site";
 import { indianStates } from "@/lib/customer";
 import { parsePin, type VisitArea } from "@/lib/service-location";
 
@@ -107,6 +108,8 @@ export function shopContact(shop: ShopSettings) {
     address: address || null,
     mapUrl: shop.mapUrl || null,
     phone: shop.phone || null,
+    /** Each number on its own, so every call link dials one number. */
+    phones: phoneNumbers(shop.phone),
     email: shop.email || null,
     serviceEmail: shop.serviceEmail || null,
     hours: shop.hours.filter((h) => h.days && h.hours),

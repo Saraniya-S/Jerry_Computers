@@ -13,7 +13,6 @@ const pending = <span className="text-fg-dim">To be confirmed</span>;
 export async function ContactSection() {
   const [shop, home] = await Promise.all([getSettings("shop"), getSettings("home")]);
   const c = shopContact(shop);
-  const generalHref = c.email ? `mailto:${c.email}` : c.phone ? telHref(c.phone) : null;
   const serviceHref = "/services/request";
 
   return (
@@ -30,13 +29,31 @@ export async function ContactSection() {
           </p>
 
           <div className="mt-10 grid gap-3 sm:grid-cols-2">
-            <EnquiryCard
-              icon={MessageSquare}
-              title="General enquiries"
-              body="Products, availability, quotes and custom builds."
-              href={generalHref}
-              cta={c.email ? "Email us" : c.phone ? "Call us" : "Contact details coming soon"}
-            />
+            {c.email || !c.phones.length ? (
+              <EnquiryCard
+                icon={MessageSquare}
+                title="General enquiries"
+                body="Products, availability, quotes and custom builds."
+                href={c.email ? `mailto:${c.email}` : null}
+                cta={c.email ? "Email us" : "Contact details coming soon"}
+              />
+            ) : (
+              // One call link per number: a single link would put both numbers into the dial pad together.
+              <div className="rounded-2xl border border-line bg-ink-900/60 p-6">
+                <MessageSquare className="size-5 text-brand" aria-hidden />
+                <p className="mt-6 text-lg font-medium tracking-tight text-fg">General enquiries</p>
+                <p className="mt-1.5 text-sm leading-relaxed text-fg-muted">Products, availability, quotes and custom builds.</p>
+                <ul className="mt-6 grid gap-2">
+                  {c.phones.map((p) => (
+                    <li key={p}>
+                      <a href={telHref(p)} className="group inline-flex items-center gap-1.5 text-sm font-medium text-fg hover:text-brand">
+                        <Phone className="size-4" aria-hidden /> Call {p}
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
             <EnquiryCard icon={Wrench} title="Service enquiries" body="Repairs, installation and maintenance requests." href={serviceHref} cta="Request a service" />
           </div>
         </Reveal>
@@ -51,14 +68,14 @@ export async function ContactSection() {
                 </a>
               )}
             </Detail>
-            <Detail icon={Phone} label="Phone">
-              {c.phone ? (
-                <a href={telHref(c.phone)} className="hover:text-brand">
-                  {c.phone}
-                </a>
-              ) : (
-                pending
-              )}
+            <Detail icon={Phone} label={c.phones.length > 1 ? "Phone numbers" : "Phone"}>
+              {c.phones.length
+                ? c.phones.map((p) => (
+                    <a key={p} href={telHref(p)} className="w-fit hover:text-brand">
+                      {p}
+                    </a>
+                  ))
+                : c.phone ?? pending}
             </Detail>
             <Detail icon={Mail} label="Email">
               {c.email ? (

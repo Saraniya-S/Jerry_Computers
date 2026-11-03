@@ -33,6 +33,16 @@ export const policyLinks = [
   { label: "Service policy", href: "/policies/service" },
 ] as const;
 
+/** A dialable link for one number. A bare 10-digit Indian mobile gets +91 so it dials from anywhere. */
 export function telHref(phone: string) {
-  return `tel:${phone.replace(/[^\d+]/g, "")}`;
+  const digits = phone.replace(/[^\d+]/g, "");
+  return `tel:${/^[6-9]\d{9}$/.test(digits) ? `+91${digits}` : digits}`;
+}
+
+/** The separate numbers in a phone field such as "97912-30446, 97915-93446" (comma, slash, semicolon or "or"). */
+export function phoneNumbers(phone: string | null | undefined) {
+  return (phone ?? "")
+    .split(/\s*(?:[,;/|]|\bor\b)\s*/i)
+    .map((p) => p.trim())
+    .filter((p) => p.replace(/\D/g, "").length >= 6);
 }

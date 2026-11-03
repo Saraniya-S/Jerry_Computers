@@ -23,3 +23,15 @@ describe("on-site visit area", () => {
     expect(checkVisit(kerala, { latitude: 8.3, longitude: 77.25 }, { shop, radiusKm: 0 })).toMatchObject({ ok: false });
   });
 });
+
+describe("shop phone numbers", () => {
+  it("splits a field holding two numbers into separate call links", async () => {
+    const { phoneNumbers, telHref } = await import("@/config/site");
+    expect(phoneNumbers("97912-30446, 97915-93446")).toEqual(["97912-30446", "97915-93446"]);
+    expect(phoneNumbers("97912 30446 / 04651 222333; or 97915-93446")).toEqual(["97912 30446", "04651 222333", "97915-93446"]);
+    expect(phoneNumbers("")).toEqual([]);
+    expect(telHref("97912-30446")).toBe("tel:+919791230446");
+    expect(telHref("+91 97915 93446")).toBe("tel:+919791593446");
+    expect(telHref("04651 222333")).toBe("tel:04651222333");
+  });
+});
