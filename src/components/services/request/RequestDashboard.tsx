@@ -7,6 +7,7 @@ import { submitServiceRequestAction, type SubmitResult } from "@/app/services/re
 import { EmptyState } from "@/components/account/PageHeader";
 import { FormAlert } from "@/components/auth/ui";
 import { emptyAddress, type AddressDraft } from "@/components/forms/AddressFields";
+import { formatPhone, phoneNumbers } from "@/config/site";
 import { addressSchema } from "@/lib/customer";
 import { checkVisit, parsePastedLocation, parsePin, type VisitArea } from "@/lib/service-location";
 import { stepDevice, stepService, type OnlineRequestInput } from "@/lib/service-request-form";
@@ -181,7 +182,7 @@ export function RequestDashboard({ services, shop, visitArea, account, signedInA
   if (!services.length) {
     return (
       <EmptyState icon={<Wrench className="size-5" aria-hidden />} title="Online requests aren't open right now">
-        No services are available to book online at the moment.{shop?.phone ? ` Call the shop on ${shop.phone} to arrange a repair.` : " Please contact the shop to arrange a repair."}
+        No services are available to book online at the moment.{phoneNumbers(shop?.phone).length ? ` Call the shop on ${phoneNumbers(shop?.phone).map(formatPhone).join(" or ")} to arrange a repair.` : " Please contact the shop to arrange a repair."}
       </EmptyState>
     );
   }

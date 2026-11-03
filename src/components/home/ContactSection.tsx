@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { ArrowUpRight, Clock, Mail, MapPin, MessageSquare, Phone, Wrench, type LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
-import { telHref } from "@/config/site";
+import { formatPhone, telHref } from "@/config/site";
 import { Accented } from "@/components/ui/Accented";
 import { getSettings } from "@/lib/server/settings";
 import { shopContact } from "@/lib/settings";
@@ -47,7 +47,7 @@ export async function ContactSection() {
                   {c.phones.map((p) => (
                     <li key={p}>
                       <a href={telHref(p)} className="group inline-flex items-center gap-1.5 text-sm font-medium text-fg hover:text-brand">
-                        <Phone className="size-4" aria-hidden /> Call {p}
+                        <Phone className="size-4" aria-hidden /> Call {formatPhone(p)}
                       </a>
                     </li>
                   ))}
@@ -71,8 +71,8 @@ export async function ContactSection() {
             <Detail icon={Phone} label={c.phones.length > 1 ? "Phone numbers" : "Phone"}>
               {c.phones.length
                 ? c.phones.map((p) => (
-                    <a key={p} href={telHref(p)} className="w-fit hover:text-brand">
-                      {p}
+                    <a key={p} href={telHref(p)} className="w-fit tabular-nums hover:text-brand">
+                      {formatPhone(p)}
                     </a>
                   ))
                 : c.phone ?? pending}

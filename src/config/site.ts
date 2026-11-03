@@ -39,6 +39,13 @@ export function telHref(phone: string) {
   return `tel:${/^[6-9]\d{9}$/.test(digits) ? `+91${digits}` : digits}`;
 }
 
+/** A number as shown on the site: Indian mobiles as "+91 97912 30446"; anything else as typed. */
+export function formatPhone(phone: string) {
+  const digits = phone.replace(/\D/g, "");
+  const mobile = /^(?:91)?([6-9]\d{9})$/.exec(digits)?.[1];
+  return mobile ? `+91 ${mobile.slice(0, 5)} ${mobile.slice(5)}` : phone.trim();
+}
+
 /** The separate numbers in a phone field such as "97912-30446, 97915-93446" (comma, slash, semicolon or "or"). */
 export function phoneNumbers(phone: string | null | undefined) {
   return (phone ?? "")

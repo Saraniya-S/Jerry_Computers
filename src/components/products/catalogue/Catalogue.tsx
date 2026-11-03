@@ -70,8 +70,6 @@ export function Catalogue({ products }: { products: Product[] }) {
     <FilterPanel
       filters={filters}
       counts={counts}
-      query={query}
-      onQuery={setQuery}
       onCategory={toggleCategory}
       onUse={toggleUse}
       onClear={active ? clearAll : undefined}
@@ -80,7 +78,27 @@ export function Catalogue({ products }: { products: Product[] }) {
 
   return (
     <div className="mx-auto max-w-[1320px] px-4 pb-24 pt-28 sm:px-6 sm:pt-32">
-      <div className="flex flex-wrap items-end justify-between gap-4">
+      {/* Search sits above everything, on every screen size, rather than inside the filter panel. */}
+      <label className="flex h-12 items-center gap-2.5 rounded-2xl border border-line-strong bg-ink-850 px-4 transition-[border-color,box-shadow] focus-within:border-brand focus-within:ring-4 focus-within:ring-[var(--brand-glow)]">
+        <Search className="size-5 shrink-0 text-fg-dim" aria-hidden />
+        <input
+          type="search"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Search laptops, CCTV, printers, brands…"
+          aria-label="Search products"
+          enterKeyHint="search"
+          style={{ outline: "none" }}
+          className="min-w-0 flex-1 bg-transparent text-[0.95rem] text-fg placeholder:text-fg-dim"
+        />
+        {query && (
+          <button type="button" onClick={() => setQuery("")} aria-label="Clear search" className="grid size-7 place-items-center rounded-full text-fg-dim hover:bg-ink-900 hover:text-fg">
+            <X className="size-4" aria-hidden />
+          </button>
+        )}
+      </label>
+
+      <div className="mt-8 flex flex-wrap items-end justify-between gap-4">
         <div>
           <h1 className="text-3xl font-medium tracking-[-0.03em] text-fg sm:text-4xl">{title}</h1>
           <p className="mt-1.5 text-sm text-fg-muted" aria-live="polite">
@@ -183,29 +201,14 @@ export function Catalogue({ products }: { products: Product[] }) {
 type PanelProps = {
   filters: Filters;
   counts: ReturnType<typeof facetCounts>;
-  query: string;
-  onQuery: (q: string) => void;
   onCategory: (id: ProductCategoryId) => void;
   onUse: (id: ProductUse) => void;
   onClear?: () => void;
 };
 
-function FilterPanel({ filters, counts, query, onQuery, onCategory, onUse, onClear }: PanelProps) {
+function FilterPanel({ filters, counts, onCategory, onUse, onClear }: PanelProps) {
   return (
     <div className="grid gap-8">
-      <label className="flex h-10 items-center gap-2 rounded-xl border border-line-strong bg-ink-850 px-3 text-sm transition-[border-color,box-shadow] focus-within:border-brand focus-within:ring-4 focus-within:ring-[var(--brand-glow)]">
-        <Search className="size-4 shrink-0 text-fg-dim" aria-hidden />
-        <input
-          type="search"
-          value={query}
-          onChange={(e) => onQuery(e.target.value)}
-          placeholder="Search products"
-          aria-label="Search products"
-          style={{ outline: "none" }}
-          className="min-w-0 flex-1 bg-transparent text-fg placeholder:text-fg-dim"
-        />
-      </label>
-
       <FilterGroup title="Category">
         <ul className="-mx-2 grid gap-0.5">
           {productCategories.map((c) => {

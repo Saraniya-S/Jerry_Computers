@@ -26,7 +26,10 @@ describe("on-site visit area", () => {
 
 describe("shop phone numbers", () => {
   it("splits a field holding two numbers into separate call links", async () => {
-    const { phoneNumbers, telHref } = await import("@/config/site");
+    const { formatPhone, phoneNumbers, telHref } = await import("@/config/site");
+    expect(formatPhone("97912-30446")).toBe("+91 97912 30446");
+    expect(formatPhone("+91 9791593446")).toBe("+91 97915 93446");
+    expect(formatPhone("04651 222333")).toBe("04651 222333");
     expect(phoneNumbers("97912-30446, 97915-93446")).toEqual(["97912-30446", "97915-93446"]);
     expect(phoneNumbers("97912 30446 / 04651 222333; or 97915-93446")).toEqual(["97912 30446", "04651 222333", "97915-93446"]);
     expect(phoneNumbers("")).toEqual([]);

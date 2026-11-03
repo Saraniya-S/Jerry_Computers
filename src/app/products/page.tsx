@@ -29,7 +29,8 @@ async function CatalogueWithData() {
 function CatalogueSkeleton() {
   return (
     <div className="mx-auto max-w-[1320px] animate-pulse px-4 pb-24 pt-28 sm:px-6 sm:pt-32" aria-busy="true" aria-label="Loading products">
-      <div className="h-9 w-56 rounded-lg bg-ink-900" />
+      <div className="h-12 rounded-2xl bg-ink-900" />
+      <div className="mt-8 h-9 w-56 rounded-lg bg-ink-900" />
       <div className="mt-3 h-4 w-32 rounded bg-ink-900" />
       <div className="mt-8 grid gap-10 lg:grid-cols-[256px_1fr]">
         <div className="hidden space-y-3 lg:block">

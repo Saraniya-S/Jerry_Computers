@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { navLinks, policyLinks, site, telHref } from "@/config/site";
+import { Mail, MapPin, Phone } from "lucide-react";
+import { formatPhone, navLinks, policyLinks, site, telHref } from "@/config/site";
 import { productCategories } from "@/data/products";
 import { serviceRequestHref } from "@/data/services";
 import { getServices } from "@/lib/server/services";
@@ -61,20 +62,38 @@ export async function HomeFooter() {
 
           <div>
             <p className="font-mono text-[0.65rem] uppercase tracking-[0.18em] text-fg-dim">Contact</p>
-            <ul className="mt-5 space-y-2.5 text-sm text-fg-muted">
-              <li>{c.address ?? "Address to be confirmed"}</li>
-              {c.phones.length ? (
-                c.phones.map((p) => (
-                  <li key={p}>
-                    <a href={telHref(p)} className="hover:text-fg">
-                      {p}
+            <ul className="mt-5 space-y-3.5 text-sm text-fg-muted">
+              <ContactRow icon={MapPin} label="Address">
+                {c.address ? (
+                  c.mapUrl ? (
+                    <a href={c.mapUrl} target="_blank" rel="noopener noreferrer" className="whitespace-pre-line hover:text-fg">
+                      {c.address}
                     </a>
-                  </li>
-                ))
-              ) : (
-                <li>{c.phone ?? "Phone to be confirmed"}</li>
-              )}
-              <li>{c.email ? <a href={`mailto:${c.email}`} className="hover:text-fg">{c.email}</a> : "Email to be confirmed"}</li>
+                  ) : (
+                    <span className="whitespace-pre-line">{c.address}</span>
+                  )
+                ) : (
+                  "Address to be confirmed"
+                )}
+              </ContactRow>
+              <ContactRow icon={Phone} label="Phone">
+                {c.phones.length
+                  ? c.phones.map((p) => (
+                      <a key={p} href={telHref(p)} className="block w-fit tabular-nums hover:text-fg">
+                        {formatPhone(p)}
+                      </a>
+                    ))
+                  : (c.phone ?? "Phone to be confirmed")}
+              </ContactRow>
+              <ContactRow icon={Mail} label="Email">
+                {c.email ? (
+                  <a href={`mailto:${c.email}`} className="break-all hover:text-fg">
+                    {c.email}
+                  </a>
+                ) : (
+                  "Email to be confirmed"
+                )}
+              </ContactRow>
             </ul>
           </div>
         </div>
@@ -106,4 +125,14 @@ export async function HomeFooter() {
 async function CurrentYear() {
   "use cache";
   return new Date().getFullYear();
+}
+
+function ContactRow({ icon: Icon, label, children }: { icon: typeof Phone; label: string; children: React.ReactNode }) {
+  return (
+    <li className="flex gap-2.5">
+      <Icon className="mt-0.5 size-4 shrink-0 text-brand" aria-hidden />
+      <span className="sr-only">{label}: </span>
+      <span className="min-w-0">{children}</span>
+    </li>
+  );
 }

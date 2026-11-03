@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { ArrowLeft, CalendarClock, MapPin, Store } from "lucide-react";
 import { Suspense } from "react";
 import { PageHeader, PageSkeleton } from "@/components/account/PageHeader";
+import { formatPhone, phoneNumbers, telHref } from "@/config/site";
 import { requireCustomer } from "@/lib/server/auth";
 import { getMyServiceRequest } from "@/lib/server/customer-service-requests";
 import { formatPaise } from "@/lib/money";
@@ -133,7 +134,11 @@ async function Request({ params }: Pick<PageProps<"/account/services/[id]">, "pa
                 {shop.legalName || "Jerry Computers"}
                 <span className="block">{shop.address}</span>
                 <span className="block">{[shop.city, shop.state, shop.postalCode].filter(Boolean).join(", ")}</span>
-                {shop.phone && <span className="block">{shop.phone}</span>}
+                {phoneNumbers(shop.phone).map((p) => (
+                  <a key={p} href={telHref(p)} className="block w-fit tabular-nums hover:text-brand">
+                    {formatPhone(p)}
+                  </a>
+                ))}
               </address>
             ) : (
               <p className="text-fg-muted">Bring the device to the shop.</p>
