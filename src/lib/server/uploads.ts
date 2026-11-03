@@ -7,7 +7,8 @@ import path from "node:path";
  * Image uploads kept on the server's disk under UPLOAD_DIR (default ./uploads) and served at
  * /uploads/<file>. Swap this module for object storage when hosting without a persistent disk.
  */
-const dir = path.resolve(process.env.UPLOAD_DIR ?? "uploads");
+// Decided at run time, so the build shouldn't try to trace it (that would pull in the whole project).
+const dir = path.resolve(/*turbopackIgnore: true*/ process.env.UPLOAD_DIR ?? "uploads");
 export const MAX_UPLOAD_BYTES = 5 * 1024 * 1024;
 
 const types: { ext: string; mime: string; magic: (b: Buffer) => boolean }[] = [

@@ -6,6 +6,8 @@ import { WhyChooseUsSection } from "@/components/home/WhyChooseUsSection";
 import { ProductsSection } from "@/components/home/ProductsSection";
 import { ContactSection } from "@/components/home/ContactSection";
 import { HomeFooter } from "@/components/home/HomeFooter";
+import { Preloader } from "@/components/home/Preloader";
+import { ReloadToTop } from "@/components/home/ReloadToTop";
 import { getServices } from "@/lib/server/services";
 import { getSettings } from "@/lib/server/settings";
 
@@ -13,6 +15,8 @@ export default async function Home() {
   const [services, home] = await Promise.all([getServices(), getSettings("home")]);
   return (
     <>
+      <Preloader />
+      <ReloadToTop />
       <a href="#main" className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[70] focus:rounded-lg focus:bg-fg focus:px-4 focus:py-2 focus:text-ink-950">
         Skip to content
       </a>

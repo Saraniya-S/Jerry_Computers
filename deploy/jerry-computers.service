@@ -1,0 +1,21 @@
+# systemd unit for the website. Installed by deploy/setup-server.sh as
+# /etc/systemd/system/jerry-computers.service. Logs: journalctl -u jerry-computers -f
+[Unit]
+Description=Jerry Computers website (Next.js)
+After=network-online.target docker.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=jerry
+WorkingDirectory=/home/jerry/app
+Environment=NODE_ENV=production
+Environment=PORT=3000
+Environment=HOSTNAME=127.0.0.1
+ExecStart=/usr/bin/node node_modules/next/dist/bin/next start -H 127.0.0.1 -p 3000
+Restart=always
+RestartSec=5
+# Uploaded product photos live in /home/jerry/app/uploads (kept across updates).
+
+[Install]
+WantedBy=multi-user.target

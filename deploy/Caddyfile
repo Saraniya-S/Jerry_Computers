@@ -1,0 +1,10 @@
+# Caddy serves the site over HTTPS (free certificates, renewed automatically) and passes
+# requests to the app on 127.0.0.1:3000. setup-server.sh replaces example.com with your domain.
+example.com, www.example.com {
+	encode zstd gzip
+	# Admins upload photos up to 5 MB each, several at a time.
+	request_body {
+		max_size 30MB
+	}
+	reverse_proxy 127.0.0.1:3000
+}

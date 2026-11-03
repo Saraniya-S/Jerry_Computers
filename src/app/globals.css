@@ -210,3 +210,103 @@ body {
     stroke-dashoffset: 30;
   }
 }
+
+/*
+ * Home page preloader (components/home/Preloader). Invisible for the first 400 ms, so quick loads
+ * never see it; React removes it once the page is ready, and it hides itself after 10 s regardless.
+ */
+.jc-preloader {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: grid;
+  place-items: center;
+  background: var(--ink-950);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  animation: jc-preloader-life 10s linear forwards;
+}
+.jc-preloader[data-leaving] {
+  animation: jc-preloader-out 300ms ease forwards;
+}
+@keyframes jc-preloader-life {
+  0%,
+  4% {
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+  }
+  6.5%,
+  97% {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+  }
+  100% {
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+  }
+}
+@keyframes jc-preloader-out {
+  from {
+    opacity: 1;
+    visibility: visible;
+  }
+  to {
+    opacity: 0;
+    visibility: hidden;
+  }
+}
+.jc-preloader-mark {
+  display: grid;
+  place-items: center;
+  border-radius: 9999px;
+  animation: jc-preloader-pulse 1.6s ease-in-out infinite;
+}
+@keyframes jc-preloader-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 color-mix(in oklab, var(--brand) 22%, transparent);
+  }
+  50% {
+    transform: scale(1.04);
+    box-shadow: 0 0 0 14px color-mix(in oklab, var(--brand) 0%, transparent);
+  }
+}
+.jc-preloader-bar {
+  position: relative;
+  width: 9rem;
+  height: 3px;
+  overflow: hidden;
+  border-radius: 9999px;
+  background: var(--line);
+}
+.jc-preloader-bar::after {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 40%;
+  border-radius: inherit;
+  background: var(--brand);
+  animation: jc-preloader-bar 1.1s ease-in-out infinite;
+}
+@keyframes jc-preloader-bar {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(250%);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  /* Keep the show/hide timing; the pulse and bar stay still (the rule above stops them). */
+  .jc-preloader {
+    animation-duration: 10s !important;
+  }
+  .jc-preloader[data-leaving] {
+    animation-duration: 0.01ms !important;
+  }
+}

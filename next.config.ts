@@ -3,6 +3,8 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   /* config options here */
   cacheComponents: true,
+  // Don't advertise the framework in every response.
+  poweredByHeader: false,
   // Services no longer have their own pages; old links open the request form with that service chosen.
   redirects() {
     return [{ source: "/services/:slug((?!request$)[a-z0-9-]+)", destination: "/services/request?service=:slug", permanent: true }];
