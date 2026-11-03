@@ -1,0 +1,9 @@
+# Caddy in Docker (deploy/docker-compose.yml). SITE_ADDRESS comes from .env.local: your domain(s)
+# get free HTTPS certificates automatically; ":80" serves plain HTTP on the server's IP until then.
+{$SITE_ADDRESS} {
+	encode zstd gzip
+	request_body {
+		max_size 30MB
+	}
+	reverse_proxy 127.0.0.1:3000
+}

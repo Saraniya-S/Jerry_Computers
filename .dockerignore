@@ -1,0 +1,9 @@
+# Keep secrets, local data and build output out of the Docker build context.
+.git
+.env*
+!.env.example
+node_modules
+.next
+uploads
+tsconfig.tsbuildinfo
+docs

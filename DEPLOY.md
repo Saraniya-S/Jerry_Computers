@@ -151,6 +151,28 @@ Then add products, engineers and staff as usual.
 
 ---
 
+## Alternative: everything in Docker
+
+Instead of steps 3–6 (Node.js and Caddy installed on the server), the database, the site and Caddy
+can all run as containers from `deploy/docker-compose.yml`. Only Docker and git are needed on the
+server, and uploaded photos and the database live on Docker volumes.
+
+1. Install Docker: `curl -fsSL https://get.docker.com | sh`, and allow SSH, HTTP and HTTPS:
+   `ufw allow OpenSSH && ufw allow 80/tcp && ufw allow 443/tcp && ufw --force enable`.
+2. Clone the code to `/opt/jerry-computers` (deploy key as in step 4).
+3. `cp deploy/env.production.example .env.local`, fill it in (step 5), and set `SITE_ADDRESS` to your
+   domain(s), e.g. `"yourdomain.com, www.yourdomain.com"`, or `:80` to use the IP address until DNS is
+   ready. Then `chmod 600 .env.local`.
+4. `./deploy/docker-update.sh --no-pull` – starts the database, runs migrations, builds the site and
+   starts it with Caddy. Later updates: `./deploy/docker-update.sh`.
+5. Create the admin account:
+   `docker compose -f deploy/docker-compose.yml --env-file .env.local run --rm --entrypoint node app scripts/create-super-admin.mjs`
+
+Logs: `docker compose -f deploy/docker-compose.yml --env-file .env.local logs -f app`. Back up the
+database with `pg_dump` through the `postgres` service, as in `deploy/backup.sh`.
+
+---
+
 ## Updating the site
 
 After pushing new code to GitHub:

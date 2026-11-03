@@ -1,5 +1,8 @@
-# Production database for the VPS. Only the app on this server can reach it (127.0.0.1).
+# Production on the VPS: the database, the website and Caddy (HTTPS), all on the host network so
+# the build can reach the database. The database and the site listen on 127.0.0.1 only; Caddy
+# serves ports 80 and 443. Run from the repository root with deploy/docker-update.sh, or:
 #   docker compose -f deploy/docker-compose.yml --env-file .env.local up -d
+# (Running only the database? `... up -d postgres` works on its own, as before.)
 services:
   postgres:
     image: postgres:17-alpine
@@ -18,5 +21,58 @@ services:
       timeout: 3s
       retries: 10
 
+  # One-off: applies database migrations (docker compose ... run --rm migrate).
+  migrate:
+    profiles: ["tools"]
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+      target: migrate
+      network: host
+    network_mode: host
+    env_file: ../.env.local
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  app:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+      target: app
+      network: host
+      secrets:
+        - app_env
+    image: jerry-computers-app
+    restart: unless-stopped
+    network_mode: host
+    env_file: ../.env.local
+    volumes:
+      - uploads:/data/uploads
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  caddy:
+    image: caddy:2.10-alpine
+    restart: unless-stopped
+    network_mode: host
+    environment:
+      # Your domain(s), e.g. "jerrycomputers.in, www.jerrycomputers.in", or ":80" before DNS is set up.
+      SITE_ADDRESS: ${SITE_ADDRESS:-:80}
+    volumes:
+      - ./Caddyfile.docker:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      - app
+
+secrets:
+  app_env:
+    file: ../.env.local
+
 volumes:
   postgres-data:
+  uploads:
+  caddy-data:
+  caddy-config:
