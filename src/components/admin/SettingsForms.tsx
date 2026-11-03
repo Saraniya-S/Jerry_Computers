@@ -82,12 +82,51 @@ export function ShopForm({ initial }: { initial: ShopSettings }) {
         <SelectField label="State" options={indianStates} placeholder="Choose a state" value={v.state} error={errors.state} onChange={(e) => set("state", e.target.value as ShopSettings["state"])} />
         <TextField label="Map link" optional value={v.mapUrl} error={errors.mapUrl} onChange={(e) => set("mapUrl", e.target.value)} placeholder="https://maps.app.goo.gl/…" />
       </Section>
+      <Section title="On-site visit area" text="Engineers visit anywhere in Kanniyakumari district, and outside it up to this distance from the shop. Customers outside the district share their location so the distance can be checked.">
+        <div className="grid gap-4 sm:grid-cols-[1fr_180px]">
+          <TextField
+            label="Shop map pin"
+            optional
+            value={v.shopPin}
+            error={errors.shopPin}
+            onChange={(e) => set("shopPin", e.target.value)}
+            placeholder="8.2030, 77.3056"
+            hint="Latitude, longitude. In Google Maps, long-press the shop and copy the numbers. Empty = Kanniyakumari district only."
+          />
+          <TextField
+            label="Distance outside the district"
+            inputMode="numeric"
+            value={String(v.visitRadiusKm)}
+            error={errors.visitRadiusKm}
+            onChange={(e) => set("visitRadiusKm", Number(e.target.value.replace(/\D/g, "").slice(0, 3) || 0))}
+            hint="In km. 0 = the district only."
+          />
+        </div>
+      </Section>
       <Section title="Contact">
         <div className="grid gap-4 sm:grid-cols-2">
           <TextField label="Phone" value={v.phone} error={errors.phone} onChange={(e) => set("phone", e.target.value)} placeholder="+91 98765 43210" />
           <TextField label="Email" type="email" value={v.email} error={errors.email} onChange={(e) => set("email", e.target.value)} />
         </div>
         <TextField label="Service email" optional type="email" value={v.serviceEmail} error={errors.serviceEmail} onChange={(e) => set("serviceEmail", e.target.value)} />
+      </Section>
+      <Section title="Invoices" text="Terms printed at the foot of every invoice.">
+        <p className="text-sm font-medium text-fg">Terms and conditions</p>
+        {v.invoiceTerms.map((t, i) => (
+          <div key={i} className="grid grid-cols-[1.5rem_1fr_auto] items-center gap-2">
+            <span className="text-right text-sm tabular-nums text-fg-dim">{i + 1}.</span>
+            <input aria-label={`Term ${i + 1}`} value={t} maxLength={160} onChange={(e) => set("invoiceTerms", v.invoiceTerms.map((x, j) => (j === i ? e.target.value : x)))} style={{ outline: "none" }} className="h-10 rounded-lg border border-line-strong bg-ink-850 px-3 text-sm focus:border-brand" />
+            <button type="button" aria-label="Remove term" onClick={() => set("invoiceTerms", v.invoiceTerms.filter((_, j) => j !== i))} className="grid size-10 place-items-center rounded-lg text-fg-dim hover:bg-ink-900">
+              <X className="size-4" aria-hidden />
+            </button>
+          </div>
+        ))}
+        {errors.invoiceTerms && <p className="text-[0.8rem] text-red-600">Each term needs some text (up to 160 characters).</p>}
+        {v.invoiceTerms.length < 8 && (
+          <button type="button" onClick={() => set("invoiceTerms", [...v.invoiceTerms, ""])} className="inline-flex h-9 w-fit items-center gap-1.5 rounded-lg border border-line-strong px-3 text-sm hover:bg-ink-900">
+            <Plus className="size-4" aria-hidden /> Add a term
+          </button>
+        )}
       </Section>
       <Section title="Opening hours">
         {v.hours.map((h, i) => (

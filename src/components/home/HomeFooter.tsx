@@ -6,6 +6,7 @@ import { getServices } from "@/lib/server/services";
 import { getSettings } from "@/lib/server/settings";
 import { shopContact } from "@/lib/settings";
 import { Logo } from "@/components/ui/Logo";
+import { SocialIcon } from "@/components/ui/SocialIcon";
 
 export async function HomeFooter() {
   const [services, shop] = await Promise.all([getServices(), getSettings("shop")]);
@@ -24,11 +25,18 @@ export async function HomeFooter() {
             <Logo />
             <p className="mt-5 max-w-xs text-sm leading-relaxed text-fg-muted">{site.description}</p>
             {c.social.length > 0 && (
-              <ul className="mt-6 flex gap-4">
+              <ul className="mt-6 flex flex-wrap gap-2.5">
                 {c.social.map((s) => (
                   <li key={s.href}>
-                    <a href={s.href} target="_blank" rel="noopener noreferrer" className="text-sm text-fg-muted hover:text-fg">
-                      {s.label}
+                    <a
+                      href={s.href}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      aria-label={s.label}
+                      title={s.label}
+                      className="grid size-10 place-items-center rounded-full border border-line bg-ink-900/60 text-fg-muted transition-colors hover:border-brand/40 hover:bg-brand/[0.06] hover:text-brand"
+                    >
+                      <SocialIcon href={s.href} label={s.label} />
                     </a>
                   </li>
                 ))}

@@ -1,5 +1,5 @@
 import "server-only";
-import { and, asc, count, desc, eq, gte, ilike, inArray, lt, notInArray, or, sql, type SQL } from "drizzle-orm";
+import { and, asc, count, desc, eq, gte, ilike, inArray, isNotNull, isNull, lt, ne, notInArray, or, sql, type SQL } from "drizzle-orm";
 import { canBuy, getCategory } from "@/data/products";
 import { shippingFor } from "@/lib/settings";
 import { getCatalogue } from "./catalogue";
@@ -8,7 +8,7 @@ import type { DispatchInput } from "@/lib/couriers";
 import { orderNumber } from "@/lib/money";
 import { logOrderMovements } from "./admin/inventory";
 import { createShipmentTx, deliverShipmentsTx, shipmentsForOrders } from "./admin/shipments";
-import { audit } from "./admin/tx";
+import { audit, type Tx } from "./admin/tx";
 import type { AddressSnapshot, InvoiceLine, OrderStatus, PaymentStatus } from "./db/schema";
 import { notify, notifyAdmins } from "./notifications";
 import { razorpayEnabled } from "./env";
@@ -16,11 +16,75 @@ import { getSettings } from "./settings";
 
 export class OrderError extends Error {}
 
+/** How long an unpaid online checkout holds its stock before it's released. */
+export const CHECKOUT_HOLD_MINUTES = 30;
+
 /**
- * Turns the customer's cart into an order at today's prices, reserves the stock, then empties the
- * cart. Throws OrderError with a message for the customer when something is no longer available.
+ * Orders that were really placed (see orders.placedAt), plus any unpaid checkout that took money
+ * after it expired and so needs a refund. Staff lists, counts and reports only ever see these.
+ */
+export const isPlaced = or(isNotNull(schema.orders.placedAt), ne(schema.orders.paymentStatus, "pending"))!;
+
+/** Puts an order's items back on the shelf and logs it. */
+async function releaseStock(tx: Tx, orderId: string, actorId: string | null) {
+  const items = await tx.select().from(schema.orderItems).where(eq(schema.orderItems.orderId, orderId));
+  const moved: { productId: string; delta: number; stockAfter: number }[] = [];
+  for (const i of items) {
+    const [p] = await tx
+      .update(schema.products)
+      .set({ stock: sql`${schema.products.stock} + ${i.quantity}` })
+      .where(eq(schema.products.slug, i.productSlug))
+      .returning({ id: schema.products.id, stock: schema.products.stock });
+    if (p) moved.push({ productId: p.id, delta: i.quantity, stockAfter: p.stock });
+  }
+  await logOrderMovements(tx, orderId, actorId, moved, "order_cancelled");
+}
+
+/** Cancels the unpaid online checkouts matching `where` and releases their stock. Rows another transaction holds are left for next time. */
+async function cancelCheckouts(tx: Tx, where: SQL, reason: string) {
+  const rows = await tx
+    .select({ id: schema.orders.id })
+    .from(schema.orders)
+    .where(and(isNull(schema.orders.placedAt), eq(schema.orders.status, "placed"), eq(schema.orders.paymentStatus, "pending"), where))
+    .for("update", { skipLocked: true });
+  for (const { id } of rows) {
+    await releaseStock(tx, id, null);
+    await tx.update(schema.orders).set({ status: "cancelled", cancelledAt: new Date(), cancelReason: reason }).where(eq(schema.orders.id, id));
+  }
+  return rows.length;
+}
+
+/**
+ * Releases the stock of online checkouts left unpaid for longer than CHECKOUT_HOLD_MINUTES. Runs
+ * before every checkout and payment attempt, so abandoned checkouts never block a buyer.
+ */
+export async function expireUnpaidCheckouts(now = new Date()) {
+  const cutoff = new Date(now.getTime() - CHECKOUT_HOLD_MINUTES * 60_000);
+  return db.transaction((tx) => cancelCheckouts(tx, lt(schema.orders.createdAt, cutoff), "Payment wasn't completed in time"));
+}
+
+/** A placed order: tell the order desk and take the bought items out of the customer's cart. */
+async function announceOrder(tx: Tx, order: { id: string; seq: number; userId: string; paymentMethod: "cod" | "online" }, slugs: string[]) {
+  const staff = await tx
+    .select({ id: schema.users.id })
+    .from(schema.users)
+    .where(and(eq(schema.users.role, "ecommerce_staff"), sql`${schema.users.disabledAt} is null`));
+  await notify(
+    tx,
+    staff.map((u) => u.id),
+    { kind: "order.placed", title: `New order ${orderNumber(order.seq)}`, body: `${order.paymentMethod === "cod" ? "Cash on delivery" : "Paid online"} · ${slugs.length} item${slugs.length === 1 ? "" : "s"}`, href: `/staff/orders/${order.id}` },
+  );
+  if (slugs.length) await tx.delete(schema.cartItems).where(and(eq(schema.cartItems.userId, order.userId), inArray(schema.cartItems.productSlug, slugs)));
+}
+
+/**
+ * Turns the customer's cart into an order at today's prices and reserves the stock. Cash on
+ * delivery is placed at once. An online checkout only holds the stock: it becomes an order (and the
+ * cart is emptied) when Razorpay confirms the payment, and is released if that doesn't happen in
+ * time. Throws OrderError with a message for the customer when something is no longer available.
  */
 export async function placeOrder(userId: string, input: { addressId: string; paymentMethod: "cod" | "online"; note: string | null }) {
+  await expireUnpaidCheckouts();
   const [catalogue, store] = await Promise.all([getCatalogue(), getSettings("store")]);
   if (input.paymentMethod === "cod" && !store.codEnabled) throw new OrderError("Cash on delivery isn't available right now. Choose online payment.");
   if (input.paymentMethod === "online" && !razorpayEnabled) throw new OrderError("Online payment isn't available right now.");
@@ -44,6 +108,8 @@ export async function placeOrder(userId: string, input: { addressId: string; pay
     // Cash on delivery is offered per product; one item without it means the order is paid online.
     const noCod = lines.find(({ p }) => !p.codAvailable);
     if (input.paymentMethod === "cod" && noCod) throw new OrderError(`${noCod.p.name} can't be paid for on delivery. Choose online payment.`);
+    // Checking out again replaces any earlier unpaid checkout, and gives its stock back first.
+    await cancelCheckouts(tx, eq(schema.orders.userId, userId), "Replaced by a newer checkout");
 
     // Reserve stock; the WHERE guards against two people buying the last unit at once.
     const moved: { productId: string; delta: number; stockAfter: number }[] = [];
@@ -80,6 +146,7 @@ export async function placeOrder(userId: string, input: { addressId: string; pay
         itemsTotalPaise: itemsTotal,
         shippingPaise: shipping,
         totalPaise: itemsTotal + shipping,
+        placedAt: input.paymentMethod === "cod" ? new Date() : null,
       })
       .returning();
     await tx.insert(schema.orderItems).values(
@@ -94,16 +161,7 @@ export async function placeOrder(userId: string, input: { addressId: string; pay
       })),
     );
     await logOrderMovements(tx, order.id, userId, moved, "order_placed");
-    const staff = await tx
-      .select({ id: schema.users.id })
-      .from(schema.users)
-      .where(and(eq(schema.users.role, "ecommerce_staff"), sql`${schema.users.disabledAt} is null`));
-    await notify(
-      tx,
-      staff.map((u) => u.id),
-      { kind: "order.placed", title: `New order ${orderNumber(order.seq)}`, body: `${input.paymentMethod === "cod" ? "Cash on delivery" : "Online payment"} · ${lines.length} item${lines.length === 1 ? "" : "s"}`, href: `/staff/orders/${order.id}` },
-    );
-    await tx.delete(schema.cartItems).where(eq(schema.cartItems.userId, userId));
+    if (order.placedAt) await announceOrder(tx, order, lines.map(({ p }) => p.slug));
     return order;
   });
 }
@@ -123,8 +181,9 @@ async function withDetails(orders: (typeof schema.orders.$inferSelect)[]) {
 }
 export type OrderWithDetails = Awaited<ReturnType<typeof withDetails>>[number];
 
+/** The customer's placed orders. Unpaid online checkouts aren't orders, so they aren't listed. */
 export async function listCustomerOrders(userId: string) {
-  return withDetails(await db.select().from(schema.orders).where(eq(schema.orders.userId, userId)).orderBy(desc(schema.orders.createdAt)));
+  return withDetails(await db.select().from(schema.orders).where(and(eq(schema.orders.userId, userId), isPlaced)).orderBy(desc(schema.orders.createdAt)));
 }
 
 export async function getCustomerOrder(userId: string, orderId: string) {
@@ -167,7 +226,7 @@ export type OrderQuery = {
 const istDay = (d: string) => new Date(`${d}T00:00:00+05:30`);
 
 function orderWhere(f: OrderQuery & { filter?: OrderFilter }) {
-  const where: SQL[] = [];
+  const where: SQL[] = [isPlaced];
   if (f.filter === "unpaid") where.push(eq(schema.orders.paymentStatus, "pending"), notInArray(schema.orders.status, ["cancelled", "returned"]));
   else if (f.filter) where.push(eq(schema.orders.status, f.filter));
   if (f.status) where.push(eq(schema.orders.status, f.status));
@@ -191,7 +250,7 @@ function orderWhere(f: OrderQuery & { filter?: OrderFilter }) {
       )!,
     );
   }
-  return where.length ? and(...where) : undefined;
+  return and(...where);
 }
 
 const orderSort = {
@@ -253,11 +312,11 @@ export async function getOrder(orderId: string) {
 
 export async function orderStats() {
   const [byStatus, [unpaid], [customers], [revenue], [lowStock]] = await Promise.all([
-    db.select({ status: schema.orders.status, n: count() }).from(schema.orders).groupBy(schema.orders.status),
+    db.select({ status: schema.orders.status, n: count() }).from(schema.orders).where(isPlaced).groupBy(schema.orders.status),
     db
       .select({ n: count() })
       .from(schema.orders)
-      .where(and(eq(schema.orders.paymentStatus, "pending"), notInArray(schema.orders.status, ["cancelled", "returned"]))),
+      .where(and(isPlaced, eq(schema.orders.paymentStatus, "pending"), notInArray(schema.orders.status, ["cancelled", "returned"]))),
     db.select({ n: count() }).from(schema.users).where(eq(schema.users.role, "customer")),
     db
       .select({ total: sql<number>`coalesce(sum(${schema.orders.totalPaise}), 0)::int`, n: count() })
@@ -278,7 +337,7 @@ export async function listCustomers() {
       ...customerCols,
       createdAt: schema.users.createdAt,
       emailVerifiedAt: schema.users.emailVerifiedAt,
-      orders: sql<number>`(select count(*)::int from ${schema.orders} where ${schema.orders.userId} = ${schema.users.id})`,
+      orders: sql<number>`(select count(*)::int from ${schema.orders} where ${schema.orders.userId} = ${schema.users.id} and ${isPlaced})`,
     })
     .from(schema.users)
     .where(eq(schema.users.role, "customer"))
@@ -334,7 +393,13 @@ export async function recordPayment(orderId: string, reference: string, staffId:
     });
 
     const now = new Date();
-    await tx.update(schema.orders).set({ paymentStatus: "paid", paidAt: now, paymentReference: reference || null }).where(eq(schema.orders.id, orderId));
+    // A verified online payment is what places the checkout as an order and confirms it.
+    const placing = !order.placedAt;
+    const autoConfirm = provider === "razorpay" && order.status === "placed";
+    await tx
+      .update(schema.orders)
+      .set({ paymentStatus: "paid", paidAt: now, paymentReference: reference || null, ...(placing ? { placedAt: now } : {}), ...(autoConfirm ? { status: "confirmed" as const } : {}) })
+      .where(eq(schema.orders.id, orderId));
     await tx.insert(schema.payments).values({
       orderId,
       kind: "payment",
@@ -374,6 +439,16 @@ export async function recordPayment(orderId: string, reference: string, staffId:
       summary: `Recorded ${order.paymentMethod === "cod" ? "cash on delivery" : "online"} payment for ${orderNumber(order.seq)}${reference ? ` (ref ${reference})` : ""}`,
       details: { amountPaise: order.totalPaise, provider },
     });
+    if (autoConfirm) {
+      await audit(tx, {
+        actorId: null,
+        action: "order.status",
+        entityType: "order",
+        entityId: orderId,
+        summary: placing ? `${orderNumber(order.seq)}: placed and confirmed (payment received)` : `${orderNumber(order.seq)}: placed → confirmed (payment received)`,
+      });
+    }
+    if (placing) await announceOrder(tx, order, items.map((i) => i.productSlug));
     return invoice;
   });
 }
@@ -394,7 +469,13 @@ export async function recordRefund(orderId: string, reference: string, staffId: 
       .where(and(eq(schema.payments.orderId, orderId), eq(schema.payments.provider, "razorpay")));
     if (gateway) throw new OrderError("This order was paid through Razorpay, so the refund goes back through Razorpay.");
     const [{ paid }] = await tx
-      .select({ paid: sql<number>`coalesce(sum(case when ${schema.payments.kind} = 'payment' then ${schema.payments.amountPaise} else -${schema.payments.amountPaise} end), 0)::int` })
+      // A refund that failed never left the shop, so it doesn't reduce what's owed back.
+      .select({
+        paid: sql<number>`coalesce(sum(case
+          when ${schema.payments.kind} = 'payment' and ${schema.payments.status} = 'succeeded' then ${schema.payments.amountPaise}
+          when ${schema.payments.kind} = 'refund' and ${schema.payments.status} in ('succeeded', 'pending') then -${schema.payments.amountPaise}
+          else 0 end), 0)::int`,
+      })
       .from(schema.payments)
       .where(eq(schema.payments.orderId, orderId));
     if (paid <= 0) throw new OrderError("No payment is recorded on this order, so there's nothing to refund.");
@@ -424,11 +505,12 @@ const flow: Record<OrderStatus, OrderStatus[]> = {
 };
 
 /**
- * Next fulfilment steps. Staff confirm a new order (or reject it by cancelling); packing and
- * dispatch then need a recorded payment for online orders.
+ * Next fulfilment steps. An online order is confirmed only by its verified payment (recordPayment
+ * does it automatically), so until then it can only be cancelled. Cash on delivery is paid after
+ * dispatch, so staff confirm those by hand.
  */
 export function allowedNext(order: { status: OrderStatus; paymentMethod: "cod" | "online"; paymentStatus: PaymentStatus }) {
-  return flow[order.status].filter((s) => s === "cancelled" || s === "confirmed" || order.paymentMethod === "cod" || order.paymentStatus === "paid");
+  return flow[order.status].filter((s) => s === "cancelled" || order.paymentMethod === "cod" || order.paymentStatus === "paid");
 }
 
 /** Cash on delivery is collected by the courier, so it can only be recorded once the parcel has gone out. */
@@ -444,10 +526,11 @@ export async function updateOrderStatus(orderId: string, to: OrderStatus, actorI
   await db.transaction(async (tx) => {
     const [order] = await tx.select().from(schema.orders).where(eq(schema.orders.id, orderId)).for("update");
     if (!order) throw new OrderError("Order not found.");
+    if (!order.placedAt && order.paymentStatus === "pending") throw new OrderError("This checkout hasn't been paid, so it isn't an order yet.");
     if (!allowedNext(order).includes(to)) {
       throw new OrderError(
         order.paymentMethod === "online" && order.paymentStatus === "pending" && to !== "cancelled"
-          ? "Wait for the online payment to come through Razorpay before packing or shipping."
+          ? "This order is confirmed automatically once its online payment comes through Razorpay."
           : `An order that is "${order.status}" can't move to "${to}".`,
       );
     }
@@ -459,18 +542,7 @@ export async function updateOrderStatus(orderId: string, to: OrderStatus, actorI
     if (to === "delivered") await deliverShipmentsTx(tx, orderId, actorId);
     if (to === "cancelled") {
       if (!extras.cancelReason?.trim()) throw new OrderError("Say why the order is being cancelled.");
-      // Put the stock back and log it.
-      const items = await tx.select().from(schema.orderItems).where(eq(schema.orderItems.orderId, orderId));
-      const moved: { productId: string; delta: number; stockAfter: number }[] = [];
-      for (const i of items) {
-        const [p] = await tx
-          .update(schema.products)
-          .set({ stock: sql`${schema.products.stock} + ${i.quantity}` })
-          .where(eq(schema.products.slug, i.productSlug))
-          .returning({ id: schema.products.id, stock: schema.products.stock });
-        if (p) moved.push({ productId: p.id, delta: i.quantity, stockAfter: p.stock });
-      }
-      await logOrderMovements(tx, orderId, actorId, moved, "order_cancelled");
+      await releaseStock(tx, orderId, actorId);
     }
 
     await tx
@@ -513,7 +585,7 @@ export async function addOrderNote(orderId: string, authorId: string, body: stri
  * (status, payment, refund, shipment updates) and internal notes.
  */
 export async function orderTimeline(orderId: string) {
-  const [order] = await db.select({ createdAt: schema.orders.createdAt }).from(schema.orders).where(eq(schema.orders.id, orderId));
+  const [order] = await db.select({ createdAt: schema.orders.createdAt, placedAt: schema.orders.placedAt }).from(schema.orders).where(eq(schema.orders.id, orderId));
   if (!order) return [];
   const [logs, notes] = await Promise.all([
     db
@@ -529,7 +601,7 @@ export async function orderTimeline(orderId: string) {
   ]);
   const name = (f: string | null, l: string | null) => (f ? `${f} ${l ?? ""}`.trim() : null);
   return [
-    { id: "placed", kind: "placed" as const, text: "Order placed by the customer", by: null, at: order.createdAt },
+    { id: "placed", kind: "placed" as const, text: "Order placed by the customer", by: null, at: order.placedAt ?? order.createdAt },
     ...logs.map((r) => ({ id: r.log.id, kind: "action" as const, text: r.log.summary, by: name(r.first, r.last), at: r.log.createdAt })),
     ...notes.map((r) => ({ id: r.note.id, kind: "note" as const, text: r.note.body, by: name(r.first, r.last), at: r.note.createdAt })),
   ].sort((a, b) => a.at.getTime() - b.at.getTime());

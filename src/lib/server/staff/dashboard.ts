@@ -2,21 +2,22 @@ import "server-only";
 import { and, asc, count, desc, eq, inArray, notInArray, or, sql } from "drizzle-orm";
 import { db, schema } from "../db";
 import type { OrderStatus } from "../db/schema";
-import { searchOrders } from "../orders";
+import { isPlaced, searchOrders } from "../orders";
 
 const o = schema.orders;
 
 /** Order-desk numbers for the staff dashboard, counted from the orders table. */
 export async function staffMetrics() {
   const [byStatus, [payments], [lowStock]] = await Promise.all([
-    db.select({ status: o.status, n: count() }).from(o).groupBy(o.status),
+    db.select({ status: o.status, n: count() }).from(o).where(isPlaced).groupBy(o.status),
     db
       .select({
         onlineToVerify: sql<number>`count(*) filter (where ${o.paymentMethod} = 'online' and ${o.paymentStatus} = 'pending' and ${o.status} not in ('cancelled', 'returned'))::int`,
         codToCollect: sql<number>`count(*) filter (where ${o.paymentMethod} = 'cod' and ${o.paymentStatus} = 'pending' and ${o.status} in ('shipped', 'delivered'))::int`,
         refundDue: sql<number>`count(*) filter (where ${o.paymentStatus} = 'refund_pending')::int`,
       })
-      .from(o),
+      .from(o)
+      .where(isPlaced),
     db
       .select({ n: count() })
       .from(schema.products)
@@ -35,11 +36,14 @@ export async function ordersNeedingAction(limit = 8) {
     .select({ id: o.id })
     .from(o)
     .where(
-      or(
-        eq(o.status, "placed"),
-        and(eq(o.status, "confirmed"), or(eq(o.paymentMethod, "cod"), eq(o.paymentStatus, "paid"))),
-        eq(o.status, "packed"),
-        and(eq(o.paymentMethod, "online"), eq(o.paymentStatus, "pending"), notInArray(o.status, ["cancelled", "returned"])),
+      and(
+        isPlaced,
+        or(
+          eq(o.status, "placed"),
+          and(eq(o.status, "confirmed"), or(eq(o.paymentMethod, "cod"), eq(o.paymentStatus, "paid"))),
+          eq(o.status, "packed"),
+          and(eq(o.paymentMethod, "online"), eq(o.paymentStatus, "pending"), notInArray(o.status, ["cancelled", "returned"])),
+        ),
       ),
     )
     .orderBy(asc(o.createdAt))
@@ -51,7 +55,8 @@ export async function ordersNeedingAction(limit = 8) {
 
 /** Why an order is on the action list. */
 export function nextActionLabel(order: { status: OrderStatus; paymentMethod: "cod" | "online"; paymentStatus: string }) {
-  if (order.paymentMethod === "online" && order.paymentStatus === "pending" && order.status !== "placed") return "Verify payment";
+  // Online orders confirm themselves when the payment comes through.
+  if (order.paymentMethod === "online" && order.paymentStatus === "pending") return "Awaiting payment";
   if (order.status === "placed") return "Confirm or reject";
   if (order.status === "confirmed") return "Pack";
   if (order.status === "packed") return "Dispatch";
@@ -66,12 +71,14 @@ export const STATUS_ORDER: OrderStatus[] = ["placed", "confirmed", "packed", "sh
 
 /** Cancelled and returned orders, newest first, with their refund state. */
 export async function cancellationsAndReturns({ kind, page = 1, pageSize = 25 }: { kind?: "cancelled" | "returned" | "refund_due"; page?: number; pageSize?: number }) {
-  const where =
+  const where = and(
+    isPlaced,
     kind === "refund_due"
       ? eq(o.paymentStatus, "refund_pending")
       : kind
         ? eq(o.status, kind)
-        : inArray(o.status, ["cancelled", "returned"]);
+        : inArray(o.status, ["cancelled", "returned"]),
+  );
   const [{ n }] = await db.select({ n: count() }).from(o).where(where);
   const ids = await db
     .select({ id: o.id })

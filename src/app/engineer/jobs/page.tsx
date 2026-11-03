@@ -28,7 +28,7 @@ async function MyJobs({ searchParams }: Pick<PageProps<"/engineer/jobs">, "searc
   const sp = await searchParams;
   const f = {
     q: param(sp.q),
-    status: oneOf(sp.status, [...statuses, "active", "closed"] as (ServiceStatus | "active" | "closed")[]) ?? (sp.status === "all" ? undefined : "active"),
+    status: oneOf(sp.status, [...statuses, "active", "closed", "helping"] as (ServiceStatus | "active" | "closed" | "helping")[]) ?? (sp.status === "all" ? undefined : "active"),
     location: oneOf(sp.location, ["in_shop", "on_site"] as const),
     priority: oneOf(sp.priority, priorities),
     sort: oneOf(sp.sort, Object.keys(sorts) as (keyof typeof sorts)[]),
@@ -45,6 +45,7 @@ async function MyJobs({ searchParams }: Pick<PageProps<"/engineer/jobs">, "searc
         <select name="status" defaultValue={sp.status === "all" ? "all" : (f.status ?? "")} aria-label="Status" className="h-9 rounded-lg border border-line-strong bg-ink-850 px-2.5 text-sm text-fg">
           <option value="">Active</option>
           <option value="all">All</option>
+          <option value="helping">Helping on (open)</option>
           <option value="closed">Completed, cancelled and handed back</option>
           {statuses.map((s) => (
             <option key={s} value={s}>

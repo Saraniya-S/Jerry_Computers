@@ -7,6 +7,8 @@ import { attempt } from "@/lib/server/admin/attempt";
 import { addServiceNote, changeServiceStatus, requestTransfer, setSchedule, withdrawTransfer } from "@/lib/server/admin/service-requests";
 import { recordCollection } from "@/lib/server/admin/collections";
 import { requireStaff } from "@/lib/server/auth";
+import { cancelLeave, requestLeave } from "@/lib/server/engineer/leave";
+import { addHelper, removeHelper } from "@/lib/server/admin/job-team";
 import type { ServiceNoteKind, ServiceStatus } from "@/lib/server/db/schema";
 
 /**
@@ -76,5 +78,47 @@ export async function engineerCollectionAction(input: { requestId: string; amoun
     return "Payment recorded.";
   });
   if (res.ok) refresh();
+  return res;
+}
+
+export async function requestLeaveAction(input: { startsOn: string; endsOn: string; reason: string }): Promise<ActionResult> {
+  const me = await requireEngineer();
+  const res = await attempt(async () => {
+    await requestLeave(me.id, input);
+    return "Leave requested. An admin will approve or reject it, and you'll be notified.";
+  });
+  if (res.ok) refresh();
+  return res;
+}
+
+export async function cancelLeaveAction(leaveId: string): Promise<ActionResult> {
+  const me = await requireEngineer();
+  const res = await attempt(async () => {
+    await cancelLeave(me.id, id.parse(leaveId));
+    return "Done.";
+  });
+  if (res.ok) refresh();
+  return res;
+}
+
+/** The lead engineer brings a colleague onto the job. */
+export async function addJobHelperAction(requestId: string, engineerId: string, reason: string): Promise<ActionResult> {
+  const me = await requireEngineer();
+  const res = await attempt(async () => {
+    await addHelper(me, { requestId: id.parse(requestId), engineerId: id.parse(engineerId), reason });
+    return "Added to the job. They've been notified.";
+  });
+  if (res.ok) refresh();
+  return res;
+}
+
+/** The lead takes a helper off the job, or a helper leaves it. */
+export async function removeJobHelperAction(requestId: string, engineerId: string): Promise<ActionResult> {
+  const me = await requireEngineer();
+  const res = await attempt(async () => {
+    await removeHelper(me, { requestId: id.parse(requestId), engineerId: id.parse(engineerId) });
+    return engineerId === me.id ? "You've left the job." : "Taken off the job.";
+  });
+  if (res.ok && engineerId !== me.id) refresh();
   return res;
 }

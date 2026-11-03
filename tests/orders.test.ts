@@ -22,9 +22,10 @@ describe("payments", () => {
     await expect(recordPayment(o.id, "  ", null, { provider: "razorpay" })).rejects.toThrow(/Razorpay payment id/);
     const [still] = await db.select().from(schema.orders).where(eq(schema.orders.id, o.id));
     expect(still.paymentStatus).toBe("pending");
-    // Online orders can be confirmed, but not packed or shipped until paid.
-    await updateOrderStatus(o.id, "confirmed", staff.id);
-    await expect(updateOrderStatus(o.id, "packed", staff.id)).rejects.toThrow(/Wait for the online payment/);
+    // An unpaid online checkout isn't an order yet: staff can't move it at all.
+    await expect(updateOrderStatus(o.id, "confirmed", staff.id)).rejects.toThrow(/isn't an order yet/);
+    await expect(updateOrderStatus(o.id, "cancelled", staff.id, { cancelReason: "x" })).rejects.toThrow(/isn't an order yet/);
+    expect((await getOrder(o.id))?.status).toBe("placed");
   });
 
   it("records a payment row with the invoice, once", async () => {
@@ -33,6 +34,8 @@ describe("payments", () => {
     await expect(recordPayment(o.id, "pay_998877", null, { provider: "razorpay" })).rejects.toThrow(/already recorded/);
     const full = await getOrder(o.id);
     expect(full?.paymentStatus).toBe("paid");
+    // The verified payment is what confirms the order.
+    expect(full?.status).toBe("confirmed");
     expect(full?.payments).toMatchObject([{ kind: "payment", amountPaise: o.totalPaise, reference: "pay_998877", provider: "razorpay", status: "succeeded", recordedById: null }]);
     expect(full?.invoice).not.toBeNull();
   });

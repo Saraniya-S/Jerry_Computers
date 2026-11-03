@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeftRight, Bell, ClipboardList, LayoutDashboard, UserRound } from "lucide-react";
+import { ArrowLeftRight, Bell, CalendarOff, ClipboardList, LayoutDashboard, UserRound } from "lucide-react";
 import type { ReactNode } from "react";
 import { DashboardShell, type NavGroup } from "@/components/account/DashboardShell";
 
@@ -11,6 +11,7 @@ const groups: NavGroup[] = [
       { href: "/engineer", label: "Dashboard", icon: LayoutDashboard, exact: true },
       { href: "/engineer/jobs", label: "My jobs", icon: ClipboardList },
       { href: "/engineer/transfers", label: "Transfer requests", icon: ArrowLeftRight },
+      { href: "/engineer/leave", label: "Leave", icon: CalendarOff },
     ],
   },
   {

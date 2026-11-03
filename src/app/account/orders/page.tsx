@@ -45,7 +45,7 @@ async function Orders() {
             </thead>
             <tbody className="divide-y divide-line">
               {orders.map((o) => (
-                <tr key={o.id} className="group hover:bg-ink-950">
+                <tr key={o.id} className="group relative hover:bg-ink-950">
                   <td className="px-5 py-3.5 font-medium text-fg sm:pl-7">
                     <Link href={`/account/orders/${o.id}`} className="after:absolute after:inset-0 hover:text-brand">
                       {orderNumber(o.seq)}
@@ -61,7 +61,7 @@ async function Orders() {
                     <StatusBadge status={o.status} />
                   </td>
                   <td className="px-5 py-3.5 tabular-nums text-fg">{formatPaise(o.totalPaise)}</td>
-                  <td className="relative px-5 py-3.5 text-right">
+                  <td className="px-5 py-3.5 text-right">
                     <Link href={`/account/orders/${o.id}`} aria-label={`View ${orderNumber(o.seq)}`} className="text-fg-dim group-hover:text-brand">
                       <ChevronRight className="ml-auto size-4" aria-hidden />
                     </Link>

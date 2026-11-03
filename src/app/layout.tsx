@@ -36,6 +36,11 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
       lang="en"
+      // Smooth scrolling (globals.css) is for in-page links only; this makes Next jump straight to the top on navigation.
+      data-scroll-behavior="smooth"
+      // Browser extensions (e.g. QuillBot's data-qb-installed) add attributes here before React loads.
+      // This only silences attribute differences on <html> itself, not on anything inside it.
+      suppressHydrationWarning
       className={`${geistSans.variable} ${geistMono.variable} ${instrumentSerif.variable} h-full antialiased`}
     >
       <body className="flex min-h-full flex-col">

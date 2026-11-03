@@ -22,6 +22,7 @@ import type { DeviceType, ServiceNoteKind, ServicePriority, ServiceStatus } from
 import { notify, notifyAdmins } from "../notifications";
 import { applyAssignment, assertAssignableEngineer, autoAssign, engineerWorkloads, lockAssignments, pickEngineer } from "./assignment";
 import { FieldError } from "./catalogue";
+import { isHelper } from "./job-team";
 import { AdminError, audit, isUniqueViolation } from "./tx";
 
 /**
@@ -166,14 +167,15 @@ export const workNoteInput = z.object({
   note: z.string().trim().min(1, "Write something first.").max(2000),
 });
 
-/** Adds a progress or work-report entry. Entries are append-only, so earlier reports are never overwritten. */
+/** Adds a progress or work-report entry (admins, the lead or a helper). Entries are append-only, so earlier reports are never overwritten. */
 export async function addServiceNote(actor: Actor, input: z.input<typeof workNoteInput>) {
   const v = workNoteInput.parse(input);
   if (v.kind === "completion") throw new AdminError("The completion report is written by completing the job.");
   await db.transaction(async (tx) => {
     const [job] = await tx.select().from(schema.serviceRequests).where(eq(schema.serviceRequests.id, v.requestId)).for("update");
     if (!job) throw new AdminError("Service request not found.");
-    assertCanWork(actor, job);
+    // Helpers on the job's team add to its work report too; everything else stays with the lead.
+    if (!(actor.role === "engineer" && (await isHelper(tx, job.id, actor.id)))) assertCanWork(actor, job);
     if (isClosedStatus(job.status) && v.kind !== "follow_up" && v.kind !== "customer_feedback") throw new AdminError("This job is closed. Only follow-up notes and customer feedback can be added.");
     await tx.insert(schema.serviceEvents).values({ requestId: job.id, kind: v.kind, note: v.note, actorId: actor.id });
   });

@@ -37,7 +37,10 @@ export async function makeProduct(opts: Partial<typeof schema.products.$inferIns
   return p;
 }
 
-/** An order straight in the database (bypassing the cart), with its stock already taken. */
+/**
+ * An order straight in the database (bypassing the cart), with its stock already taken. Cash on
+ * delivery is placed at once; an online one is an unpaid checkout until recordPayment places it.
+ */
 export async function makeOrder(customerId: string, product: { slug: string; name: string; pricePaise: number | null }, opts: Partial<typeof schema.orders.$inferInsert> = {}) {
   const total = product.pricePaise! * 1;
   const [o] = await db
@@ -48,6 +51,7 @@ export async function makeOrder(customerId: string, product: { slug: string; nam
       itemsTotalPaise: total,
       totalPaise: total,
       shippingAddress: { label: "Home", recipientName: "Test", phone: "+91 98765 43210", line1: "1 Test Street", line2: null, landmark: null, city: "Chennai", state: "Tamil Nadu", postalCode: "600001" },
+      placedAt: opts.paymentMethod === "online" ? null : new Date(),
       ...opts,
     })
     .returning();

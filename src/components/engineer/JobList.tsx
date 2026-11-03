@@ -5,7 +5,7 @@ import { Badge, dateTimeFmt, Table, td } from "@/components/admin/ui";
 import type { ServiceRequest } from "@/lib/server/db/schema";
 import { deviceTypeLabel, serviceNumber } from "@/lib/service-desk";
 
-type Job = ServiceRequest & { transferPending?: boolean };
+type Job = ServiceRequest & { transferPending?: boolean; helping?: boolean };
 
 const device = (j: Job) => [deviceTypeLabel[j.deviceType], [j.deviceBrand, j.deviceModel].filter(Boolean).join(" ")].filter(Boolean).join(" · ");
 const where = (j: Job) => (j.location === "on_site" ? (j.serviceAddress ? `${j.serviceAddress.city} ${j.serviceAddress.postalCode}` : "On-site") : "In shop");
@@ -39,6 +39,7 @@ export function JobList({ jobs }: { jobs: Job[] }) {
                 <span className="flex gap-1.5">
                   <ServiceStatusBadge status={j.status} />
                   {j.transferPending && <Badge tone="warn">Transfer requested</Badge>}
+                  {j.helping && <Badge tone="info">Helping</Badge>}
                 </span>
               </td>
               <td className={`${td} text-fg-muted`}>{j.scheduledAt ? dateTimeFmt.format(j.scheduledAt) : "—"}</td>
@@ -57,6 +58,7 @@ export function JobList({ jobs }: { jobs: Job[] }) {
                   <ServiceStatusBadge status={j.status} />
                   <PriorityBadge priority={j.priority} />
                   {j.transferPending && <Badge tone="warn">Transfer requested</Badge>}
+                  {j.helping && <Badge tone="info">Helping</Badge>}
                 </p>
                 <p className="mt-1 text-sm text-fg">
                   {device(j)} · {j.contactName}

@@ -10,10 +10,10 @@ import { AdminError, audit, type Db, type Tx } from "./tx";
  * Automatic engineer assignment.
  *
  * Eligible: an engineer account that is switched on, has set its password (so it can sign in),
- * is marked available, takes this device type (no skills listed = takes everything) and, for
+ * is marked available, isn't on approved leave today (shop time), takes this device type (no skills listed = takes everything) and, for
  * on-site jobs, takes on-site work.
  *
- * Choice: fewest active jobs (ACTIVE_SERVICE_STATUSES); ties go to whoever was assigned a job
+ * Choice: fewest active jobs (ACTIVE_SERVICE_STATUSES, led or helping on); ties go to whoever was assigned a job
  * least recently (never assigned counts as longest ago), then the longest-standing account, then
  * user id, so the same inputs always pick the same engineer.
  *
@@ -27,7 +27,13 @@ export async function lockAssignments(tx: Tx) {
 }
 
 const activeJobs = sql<number>`(select count(*)::int from ${schema.serviceRequests} r
-  where r.assigned_engineer_id = ${schema.users.id} and r.status in (${sql.join(ACTIVE_SERVICE_STATUSES.map((s) => sql`${s}`), sql`, `)}))`;
+  where r.status in (${sql.join(ACTIVE_SERVICE_STATUSES.map((s) => sql`${s}`), sql`, `)})
+    and (r.assigned_engineer_id = ${schema.users.id}
+      or exists (select 1 from ${schema.serviceJobHelpers} h where h.request_id = r.id and h.engineer_id = ${schema.users.id} and h.removed_at is null)))`;
+/** Last day of the leave covering today in shop time, or null when they're at work. */
+const onLeaveUntil = sql<string | null>`(select max(l.ends_on)::text from ${schema.engineerLeave} l
+  where l.engineer_id = ${schema.users.id} and l.status = 'approved' and l.starts_on <= (now() at time zone 'Asia/Kolkata')::date and l.ends_on >= (now() at time zone 'Asia/Kolkata')::date)`;
+const leaveEnd = new Intl.DateTimeFormat("en-IN", { day: "numeric", month: "short", timeZone: "UTC" });
 const lastAssignedAt = sql<Date | null>`(select max(a.created_at) from ${schema.serviceAssignments} a
   where a.engineer_id = ${schema.users.id} and a.method <> 'unassigned')`;
 
@@ -48,6 +54,7 @@ export async function engineerWorkloads(q: Db = db, job?: { deviceType: DeviceTy
       takesOnSite: sql<boolean>`coalesce(${schema.engineerProfiles.takesOnSite}, true)`,
       activeJobs,
       lastAssignedAt,
+      onLeaveUntil,
     })
     .from(schema.users)
     .leftJoin(schema.engineerProfiles, eq(schema.engineerProfiles.userId, schema.users.id))
@@ -59,7 +66,8 @@ export async function engineerWorkloads(q: Db = db, job?: { deviceType: DeviceTy
       let ineligible: string | null = null;
       if (r.disabled) ineligible = "Account switched off";
       else if (!r.hasPassword) ineligible = "Hasn't accepted the invitation yet";
-      else if (!r.isAvailable) ineligible = "Marked unavailable";
+      else if (!r.isAvailable) ineligible = "Not taking new jobs";
+      else if (r.onLeaveUntil) ineligible = `On leave until ${leaveEnd.format(new Date(`${r.onLeaveUntil}T00:00:00Z`))}`;
       else if (job && skills.length && !skills.includes(job.deviceType)) ineligible = "Doesn't take this device type";
       else if (job?.location === "on_site" && !r.takesOnSite) ineligible = "Doesn't take on-site jobs";
       return { ...r, skills, lastAssignedAt: r.lastAssignedAt ? new Date(r.lastAssignedAt) : null, ineligible };
@@ -110,6 +118,13 @@ export async function applyAssignment(tx: Tx, requestId: string, opts: AssignOpt
     .update(schema.serviceRequests)
     .set({ assignedEngineerId: opts.engineerId, assignedAt: opts.engineerId ? new Date() : null, acceptedAt: null, status })
     .where(eq(schema.serviceRequests.id, requestId));
+  // A helper who becomes the lead is no longer also a helper.
+  if (opts.engineerId) {
+    await tx
+      .update(schema.serviceJobHelpers)
+      .set({ removedAt: new Date() })
+      .where(and(eq(schema.serviceJobHelpers.requestId, requestId), eq(schema.serviceJobHelpers.engineerId, opts.engineerId), isNull(schema.serviceJobHelpers.removedAt)));
+  }
   await tx.insert(schema.serviceAssignments).values({
     requestId,
     engineerId: opts.engineerId,

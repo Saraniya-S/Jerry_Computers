@@ -7,6 +7,7 @@ import { z } from "zod";
 import type { ActionResult } from "@/lib/admin/result";
 import { attempt } from "@/lib/server/admin/attempt";
 import { engineerProfileInput, updateEngineerProfile } from "@/lib/server/admin/engineers";
+import { addHelper, removeHelper } from "@/lib/server/admin/job-team";
 import { addServiceNote, changeServiceStatus, createServiceRequest, decideTransfer, overrideAssignment, setSchedule, type statusChangeInput } from "@/lib/server/admin/service-requests";
 import { markRead } from "@/lib/server/notifications";
 import { recordCollection } from "@/lib/server/admin/collections";
@@ -121,6 +122,27 @@ export async function recordCollectionAction(input: { requestId: string; amount:
   const res = await attempt(async () => {
     await recordCollection(admin, input as Parameters<typeof recordCollection>[1]);
     return input.correction ? "Correction recorded." : "Payment recorded.";
+  });
+  if (res.ok) refresh();
+  return res;
+}
+
+/** Adds another engineer to a job's team (for work that needs more than one person). */
+export async function addJobHelperAction(requestId: string, engineerId: string, reason: string): Promise<ActionResult> {
+  const admin = await requirePermission("service.manage");
+  const res = await attempt(async () => {
+    await addHelper(admin, { requestId: id.parse(requestId), engineerId: id.parse(engineerId), reason });
+    return "Engineer added to the job. They've been notified.";
+  });
+  if (res.ok) refresh();
+  return res;
+}
+
+export async function removeJobHelperAction(requestId: string, engineerId: string): Promise<ActionResult> {
+  const admin = await requirePermission("service.manage");
+  const res = await attempt(async () => {
+    await removeHelper(admin, { requestId: id.parse(requestId), engineerId: id.parse(engineerId) });
+    return "Taken off the job.";
   });
   if (res.ok) refresh();
   return res;

@@ -116,7 +116,10 @@ export function TiltedTiles({ images, heroId }: { images: string[]; heroId: stri
     Array.from({ length: perColumn }, (_, k) => images[(c * 5 + k * 7) % images.length]),
   );
 
-  const fade = `linear-gradient(to bottom, transparent 0%, #000 ${tiles.fadeTop}%, #000 100%)`;
+  // The fade is painted over the tiles rather than masked: a mask on this tilted, constantly moving
+  // plane makes the browser re-render every photo whenever the hover tilt changes, which flickers.
+  // The hero behind is solid ink-950, so fading to it looks the same.
+  const fade = `linear-gradient(to bottom, var(--ink-950) 0%, transparent ${tiles.fadeTop}%)`;
 
   return (
     <div ref={wrapRef} aria-hidden className="absolute inset-0 overflow-hidden" style={{ perspective: tiles.perspective }}>
@@ -132,8 +135,7 @@ export function TiltedTiles({ images, heroId }: { images: string[]; heroId: stri
           rotateX,
           rotateY,
           rotateZ: tiles.rotateZ,
-          maskImage: fade,
-          WebkitMaskImage: fade,
+          willChange: "transform",
         }}
       >
         <div className="flex h-full" style={{ gap: tiles.gap }}>
@@ -152,11 +154,12 @@ export function TiltedTiles({ images, heroId }: { images: string[]; heroId: stri
                   <div key={k} className="relative aspect-square w-full shrink-0 overflow-hidden bg-ink-800">
                     <Image src={src} alt="" fill sizes="(max-width: 768px) 120px, 220px" className="object-cover" />
                   </div>
-                  ))}
-                </div>
+                ))}
               </div>
+            </div>
           ))}
         </div>
+        <div className="pointer-events-none absolute inset-0" style={{ background: fade }} />
       </motion.div>
     </div>
   );

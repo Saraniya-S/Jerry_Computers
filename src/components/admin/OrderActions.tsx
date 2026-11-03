@@ -66,7 +66,7 @@ export function OrderActions({ orderId, status, next, canRecordPayment, hasInvoi
         )}
         {waitingForPayment && (
           <>
-            <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">Waiting for the customer to pay through Razorpay. It&apos;s marked paid automatically once Razorpay confirms; pack it after that.</p>
+            <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">Waiting for the customer to pay through Razorpay. The order is marked paid and confirmed automatically once Razorpay confirms the payment; it can&apos;t be confirmed before that.</p>
             <button type="button" onClick={() => go("sync", () => syncPaymentAction(orderId))} disabled={busy !== null} className={btn}>
               {busy === "sync" ? <Spinner /> : <RefreshCw className="size-4" aria-hidden />} Check payment with Razorpay
             </button>

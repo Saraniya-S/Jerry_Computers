@@ -45,10 +45,13 @@ async function call<T>(method: "GET" | "POST", path: string, body?: unknown): Pr
     console.error("[razorpay] request failed", method, path, err);
     throw new GatewayError("Couldn't reach Razorpay. Please try again.");
   }
-  const data = (await res.json().catch(() => null)) as (T & { error?: { description?: string } }) | null;
+  const data = (await res.json().catch(() => null)) as (T & { error?: { code?: string; description?: string; field?: string | null; reason?: string | null; step?: string | null } }) | null;
   if (!res.ok || !data) {
     console.error("[razorpay]", method, path, res.status, data?.error);
-    throw new GatewayError(data?.error?.description ?? `Razorpay returned an error (${res.status}).`);
+    const e = data?.error;
+    // Razorpay's description alone can be vague ("invalid request sent"); keep the detail it gives.
+    const detail = [e?.field && `field: ${e.field}`, e?.reason && e.reason !== "NA" && `reason: ${e.reason}`, e?.code && `code: ${e.code}`, `HTTP ${res.status}`].filter(Boolean).join(", ");
+    throw new GatewayError(`${e?.description ?? "Razorpay returned an error"} (${detail})`);
   }
   return data;
 }

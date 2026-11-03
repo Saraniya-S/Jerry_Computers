@@ -18,7 +18,8 @@ import { can } from "@/lib/server/permissions";
  */
 export async function OrderDetail({ id, staff, basePath, customerHref }: { id: string; staff: Staff; basePath: string; customerHref?: (customerId: string) => string }) {
   const order = /^[0-9a-f-]{36}$/i.test(id) ? await getOrder(id) : null;
-  if (!order) notFound();
+  // An unpaid online checkout isn't an order yet (see orders.placedAt).
+  if (!order || (!order.placedAt && order.paymentStatus === "pending")) notFound();
   const timeline = await orderTimeline(order.id);
   const c = order.customer;
   const next = (can(staff.role, "orders.fulfil") ? allowedNext(order) : []) as ("confirmed" | "packed" | "shipped" | "delivered" | "cancelled")[];
@@ -82,9 +83,14 @@ export async function OrderDetail({ id, staff, basePath, customerHref }: { id: s
                       </p>
                       {p.note && <p className="mt-0.5 text-xs text-fg-dim">{p.note}</p>}
                     </div>
-                    <span className={`tabular-nums font-medium ${p.kind === "refund" ? "text-red-700" : "text-fg"}`}>
-                      {p.kind === "refund" ? "−" : ""}
-                      {formatPaise(p.amountPaise)}
+                    <span className="grid shrink-0 justify-items-end gap-1">
+                      {/* A failed refund never left the shop: shown for the record, struck through and not counted. */}
+                      <span className={`tabular-nums font-medium ${p.status === "failed" ? "text-fg-dim line-through" : p.kind === "refund" ? "text-red-700" : "text-fg"}`}>
+                        {p.kind === "refund" ? "−" : ""}
+                        {formatPaise(p.amountPaise)}
+                      </span>
+                      {p.status === "failed" && <Badge tone="bad">Failed</Badge>}
+                      {p.status === "pending" && <Badge tone="warn">Processing</Badge>}
                     </span>
                   </li>
                 ))}

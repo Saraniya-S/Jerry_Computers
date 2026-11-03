@@ -1,4 +1,6 @@
 import "server-only";
+import { eq } from "drizzle-orm";
+import { db, schema } from "./db";
 import { renderInvoicePdf } from "./invoice-pdf";
 import { sendInvoiceEmail } from "./mail";
 import { getOrder, OrderError } from "./orders";
@@ -8,6 +10,7 @@ import { getSettings } from "./settings";
 export async function invoicePdf(orderId: string) {
   const order = await getOrder(orderId);
   if (!order?.invoice) return null;
+  const [issuer] = order.invoice.sentById ? await db.select({ firstName: schema.users.firstName, lastName: schema.users.lastName }).from(schema.users).where(eq(schema.users.id, order.invoice.sentById)) : [];
   const pdf = await renderInvoicePdf({
     invoice: order.invoice,
     orderSeq: order.seq,
@@ -16,6 +19,8 @@ export async function invoicePdf(orderId: string) {
     paymentReference: order.paymentReference,
     shipTo: order.shippingAddress,
     shop: await getSettings("shop"),
+    // Razorpay payments are recorded by the system, so no staff member issued them.
+    billedBy: issuer ? `${issuer.firstName} ${issuer.lastName}`.trim() : "Online",
   });
   return { pdf, order, invoice: order.invoice };
 }

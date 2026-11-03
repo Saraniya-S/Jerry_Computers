@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { ClipboardList } from "lucide-react";
 import { Suspense, type ReactNode } from "react";
+import { outlineButton } from "@/components/account/buttons";
 import { PageHeader, PageSkeleton } from "@/components/account/PageHeader";
 import { DateRange, dateParam, FilterBar, Panel, Table, td } from "@/components/admin/ui";
 import { formatPaise, orderStatusLabel } from "@/lib/money";
@@ -52,7 +54,15 @@ async function Reports({ searchParams }: Pick<PageProps<"/admin/reports">, "sear
 
   return (
     <>
-      <PageHeader title="Reports" description={`${from} to ${to} (shop time). Money figures come from recorded payments and refunds; order figures from orders placed in the period.`} />
+      <PageHeader
+        title="Reports"
+        description={`${from} to ${to} (shop time). Money figures come from recorded payments and refunds; order figures from orders placed in the period.`}
+        actions={
+          <Link href={`/admin/reports/service?from=${from}&to=${to}`} className={outlineButton}>
+            <ClipboardList className="size-4" aria-hidden /> Service desk report
+          </Link>
+        }
+      />
       <FilterBar>
         <DateRange from={from} to={to} />
         <span className="flex flex-wrap gap-1.5">
@@ -146,7 +156,7 @@ async function Reports({ searchParams }: Pick<PageProps<"/admin/reports">, "sear
             </Table>
           </Panel>
 
-          <Panel title="Service requests" href="/admin/service-requests">
+          <Panel title="Service requests" href={`/admin/reports/service?from=${from}&to=${to}`}>
             <div className="grid grid-cols-2 gap-px bg-line text-sm sm:grid-cols-3">
               <Cell label="Created in the period" value={service.created} />
               <Cell label="Completed in the period" value={service.completed.n} />

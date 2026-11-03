@@ -3,16 +3,20 @@ import { and, asc, count, desc, eq, gte, ilike, inArray, lt, or, sql, type SQL }
 import { alias } from "drizzle-orm/pg-core";
 import { ACTIVE_SERVICE_STATUSES, CLOSED_SERVICE_STATUSES } from "@/lib/service-desk";
 import { engineerWorkloads } from "../admin/assignment";
+import { helpingOn, jobTeam } from "../admin/job-team";
 import { db, schema } from "../db";
 import type { ServicePriority, ServiceStatus } from "../db/schema";
 
 /**
- * Reads for the engineer area. Every query is scoped to jobs currently assigned to the engineer in
- * SQL, so another engineer's job (or customer) is simply not found.
+ * Reads for the engineer area. Every query is scoped in SQL to jobs the engineer leads (is assigned)
+ * or is helping on, so another engineer's job (or customer) is simply not found.
  */
 
 const r = schema.serviceRequests;
 const mine = (engineerId: string) => eq(r.assignedEngineerId, engineerId);
+const helping = (engineerId: string) => helpingOn(r.id, engineerId);
+/** Leading or helping. */
+const onTeam = (engineerId: string) => or(mine(engineerId), helping(engineerId))!;
 const priorityRank = sql`case ${r.priority} when 'urgent' then 0 when 'high' then 1 when 'normal' then 2 else 3 end`;
 
 /** Start of today and tomorrow in shop time (IST). */
@@ -24,7 +28,7 @@ export function istToday(now = new Date()) {
 
 export async function engineerSummary(engineerId: string) {
   const { start, end } = istToday();
-  const [byStatus, [completed], [today], [transfers], todayJobs] = await Promise.all([
+  const [byStatus, [completed], [today], [transfers], todayJobs, [helpingNow]] = await Promise.all([
     db.select({ status: r.status, n: count() }).from(r).where(mine(engineerId)).groupBy(r.status),
     db
       .select({ n: count(), last30: sql<number>`count(*) filter (where ${r.completedAt} >= now() - interval '30 days')::int` })
@@ -33,7 +37,7 @@ export async function engineerSummary(engineerId: string) {
     db
       .select({ n: count() })
       .from(r)
-      .where(and(mine(engineerId), inArray(r.status, ACTIVE_SERVICE_STATUSES), gte(r.scheduledAt, start), lt(r.scheduledAt, end))),
+      .where(and(onTeam(engineerId), inArray(r.status, ACTIVE_SERVICE_STATUSES), gte(r.scheduledAt, start), lt(r.scheduledAt, end))),
     db
       .select({ n: count() })
       .from(schema.transferRequests)
@@ -41,8 +45,12 @@ export async function engineerSummary(engineerId: string) {
     db
       .select()
       .from(r)
-      .where(and(mine(engineerId), inArray(r.status, ACTIVE_SERVICE_STATUSES), gte(r.scheduledAt, start), lt(r.scheduledAt, end)))
+      .where(and(onTeam(engineerId), inArray(r.status, ACTIVE_SERVICE_STATUSES), gte(r.scheduledAt, start), lt(r.scheduledAt, end)))
       .orderBy(asc(r.scheduledAt)),
+    db
+      .select({ n: count() })
+      .from(r)
+      .where(and(helping(engineerId), inArray(r.status, ACTIVE_SERVICE_STATUSES))),
   ]);
   const s = Object.fromEntries(byStatus.map((x) => [x.status, x.n])) as Partial<Record<ServiceStatus, number>>;
   return {
@@ -57,6 +65,8 @@ export async function engineerSummary(engineerId: string) {
     completedLast30: completed.last30,
     scheduledToday: today.n,
     todayJobs,
+    /** Open jobs led by someone else that this engineer is helping on. */
+    helping: helpingNow.n,
     pendingTransfers: transfers.n,
   };
 }
@@ -69,14 +79,14 @@ export async function recentActivity(engineerId: string, limit = 8) {
     .from(schema.serviceEvents)
     .innerJoin(r, eq(r.id, schema.serviceEvents.requestId))
     .leftJoin(actor, eq(actor.id, schema.serviceEvents.actorId))
-    .where(mine(engineerId))
+    .where(onTeam(engineerId))
     .orderBy(desc(schema.serviceEvents.createdAt))
     .limit(limit);
 }
 
 export type MyJobQuery = {
   q?: string;
-  status?: ServiceStatus | "active" | "closed";
+  status?: ServiceStatus | "active" | "closed" | "helping";
   location?: "in_shop" | "on_site";
   priority?: ServicePriority;
   sort?: "priority" | "scheduled" | "assigned_desc" | "assigned_asc";
@@ -85,8 +95,9 @@ export type MyJobQuery = {
 };
 
 export async function searchMyJobs(engineerId: string, f: MyJobQuery = {}) {
-  const where: SQL[] = [mine(engineerId)];
+  const where: SQL[] = [onTeam(engineerId)];
   if (f.status === "active") where.push(inArray(r.status, ACTIVE_SERVICE_STATUSES));
+  else if (f.status === "helping") where.push(helping(engineerId), inArray(r.status, ACTIVE_SERVICE_STATUSES));
   else if (f.status === "closed") where.push(inArray(r.status, [...CLOSED_SERVICE_STATUSES, "unable_to_complete"]));
   else if (f.status) where.push(eq(r.status, f.status));
   if (f.location) where.push(eq(r.location, f.location));
@@ -131,16 +142,19 @@ export async function searchMyJobs(engineerId: string, f: MyJobQuery = {}) {
       .where(and(eq(schema.transferRequests.fromEngineerId, engineerId), eq(schema.transferRequests.status, "pending"))),
   ]);
   const pendingIds = new Set(pending.map((p) => p.requestId));
-  return { rows: rows.map((j) => ({ ...j, transferPending: pendingIds.has(j.id) })), total: n, page, pageSize };
+  return { rows: rows.map((j) => ({ ...j, transferPending: pendingIds.has(j.id), helping: j.assignedEngineerId !== engineerId })), total: n, page, pageSize };
 }
 
-/** One job, only if it is currently assigned to this engineer. */
+/** One job, only if this engineer currently leads it or is helping on it. */
 export async function getMyJob(engineerId: string, id: string) {
-  const [job] = await db
-    .select()
+  const lead = alias(schema.users, "lead");
+  const [row] = await db
+    .select({ job: r, leadName: sql<string | null>`${lead.firstName} || ' ' || ${lead.lastName}`, leadPhone: lead.phone })
     .from(r)
-    .where(and(eq(r.id, id), mine(engineerId)));
-  if (!job) return null;
+    .leftJoin(lead, eq(lead.id, r.assignedEngineerId))
+    .where(and(eq(r.id, id), onTeam(engineerId)));
+  if (!row) return null;
+  const { job } = row;
   const actor = alias(schema.users, "actor");
   const to = alias(schema.users, "to_eng");
   const prev = alias(schema.users, "prev_eng");
@@ -165,7 +179,7 @@ export async function getMyJob(engineerId: string, id: string) {
       .where(and(eq(schema.transferRequests.requestId, id), eq(schema.transferRequests.fromEngineerId, engineerId)))
       .orderBy(desc(schema.transferRequests.createdAt)),
   ]);
-  return { ...job, events, assignments, transfers };
+  return { ...job, events, assignments, transfers, team: await jobTeam(id), isLead: job.assignedEngineerId === engineerId, leadName: row.leadName?.trim() || null, leadPhone: row.leadPhone };
 }
 export type MyJob = NonNullable<Awaited<ReturnType<typeof getMyJob>>>;
 

@@ -5,6 +5,7 @@ import {
   ArrowLeftRight,
   Bell,
   Boxes,
+  CalendarOff,
   ChartColumn,
   ClipboardList,
   ExternalLink,
@@ -56,6 +57,7 @@ const adminGroups: NavGroup[] = [
     items: [
       { href: "/admin/service-requests", label: "Service requests", icon: ClipboardList },
       { href: "/admin/transfers", label: "Transfer approvals", icon: ArrowLeftRight },
+      { href: "/admin/leave", label: "Leave requests", icon: CalendarOff },
       { href: "/admin/engineers", label: "Engineers", icon: HardHat },
       { href: "/admin/services", label: "Service catalogue", icon: Wrench },
     ],

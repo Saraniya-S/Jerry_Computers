@@ -8,6 +8,7 @@ import { EmptyState } from "@/components/account/PageHeader";
 import { FormAlert } from "@/components/auth/ui";
 import { emptyAddress, type AddressDraft } from "@/components/forms/AddressFields";
 import { addressSchema } from "@/lib/customer";
+import { checkVisit, parsePastedLocation, parsePin, type VisitArea } from "@/lib/service-location";
 import { stepDevice, stepService, type OnlineRequestInput } from "@/lib/service-request-form";
 import { DeviceStep, MethodStep, ReviewStep, ServiceStep, Stepper, SuccessCard, Summary } from "./parts";
 import { OTHER, STEPS, type Draft, type RequestAccount, type RequestService, type ShopInfo } from "./types";
@@ -17,6 +18,12 @@ export type { RequestAccount, RequestService, ShopInfo } from "./types";
 const DRAFT_KEY = "jc:service-request-draft";
 
 const newId = () => (typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`.replace(/[^0-9a-f-]/g, "0"));
+
+/** The device's own fix wins; otherwise what the customer pasted (a pin, or a link). */
+function sharedLocation(draft: Draft) {
+  const pasted = draft.pastedLocation.trim() ? parsePastedLocation(draft.pastedLocation) : null;
+  return { pin: draft.pin || pasted?.pin || "", mapsUrl: pasted?.mapsUrl ?? "" };
+}
 
 function blankDraft(account: RequestAccount | null, preselect: string | null): Draft {
   const saved = account?.addresses.find((a) => a.isDefault) ?? account?.addresses[0];
@@ -32,6 +39,7 @@ function blankDraft(account: RequestAccount | null, preselect: string | null): D
     address: emptyAddress(account?.firstName ?? "", ""),
     pin: "",
     pinAccuracy: null,
+    pastedLocation: "",
     preferredDate: "",
     preferredWindow: "",
     phone: "",
@@ -39,10 +47,10 @@ function blankDraft(account: RequestAccount | null, preselect: string | null): D
   };
 }
 
-type Props = { services: RequestService[]; shop: ShopInfo | null; account: RequestAccount | null; signedInAsStaff: boolean; preselect: string | null };
+type Props = { services: RequestService[]; shop: ShopInfo | null; visitArea: VisitArea; account: RequestAccount | null; signedInAsStaff: boolean; preselect: string | null };
 
 /** The whole request flow: pick a service, describe the device, choose on-site or in-shop, review and send. */
-export function RequestDashboard({ services, shop, account, signedInAsStaff, preselect }: Props) {
+export function RequestDashboard({ services, shop, visitArea, account, signedInAsStaff, preselect }: Props) {
   const [draft, setDraft] = useState<Draft>(() => blankDraft(account, preselect));
   const [step, setStep] = useState(0);
   const [restored, setRestored] = useState(false);
@@ -101,6 +109,12 @@ export function RequestDashboard({ services, shop, account, signedInAsStaff, pre
       if (draft.location === "on_site") {
         const r = addressSchema.safeParse(address);
         if (!r.success) for (const i of r.error.issues) e[`address.${String(i.path[0])}`] ??= i.message;
+        else {
+          const shared = sharedLocation(draft).pin;
+          const visit = checkVisit(address, shared ? parsePin(shared) : null, visitArea);
+          if (!visit.ok) e.serviceArea = visit.message;
+        }
+        if (draft.pastedLocation.trim() && !parsePastedLocation(draft.pastedLocation)) e.pastedLocation = "Paste a map link, or coordinates like 12.9716, 80.2209.";
       }
       if (account && !account.phone && !/^\s*(\+?91[\s-]?)?0?[6-9]\d{9}\s*$/.test(draft.phone.replace(/\s/g, ""))) e.phone = "Enter a 10-digit Indian mobile number.";
       if (draft.preferredWindow && !draft.preferredDate) e.preferredDate = "Choose a day for that time.";
@@ -136,7 +150,7 @@ export function RequestDashboard({ services, shop, account, signedInAsStaff, pre
         serialNumber: draft.serialNumber,
         issue: draft.issue,
         location: draft.location as "in_shop" | "on_site",
-        address: draft.location === "on_site" ? { ...address, mapsUrl: "", pin: draft.pin } : undefined,
+        address: draft.location === "on_site" ? { ...address, ...sharedLocation(draft) } : undefined,
         phone: account?.phone ? "" : draft.phone,
         preferredDate: draft.preferredDate,
         preferredWindow: draft.preferredWindow as OnlineRequestInput["preferredWindow"],
@@ -203,7 +217,7 @@ export function RequestDashboard({ services, shop, account, signedInAsStaff, pre
         >
           {step === 0 && <ServiceStep services={services} draft={draft} set={set} errors={errors} />}
           {step === 1 && <DeviceStep service={service} draft={draft} set={set} errors={errors} />}
-          {step === 2 && <MethodStep draft={draft} set={set} errors={errors} account={account} shop={shop} />}
+          {step === 2 && <MethodStep draft={draft} set={set} errors={errors} account={account} shop={shop} visitArea={visitArea} />}
           {step === 3 && <ReviewStep draft={draft} service={service} address={draft.location === "on_site" ? address : null} shop={shop} onEdit={(i) => setStep(i)} />}
 
           {result && !result.ok && (

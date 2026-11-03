@@ -5,7 +5,7 @@ import { audit, isUniqueViolation } from "./admin/tx";
 import { db, schema } from "./db";
 import { razorpayEnabled } from "./env";
 import { notifyAdmins } from "./notifications";
-import { OrderError, recordPayment } from "./orders";
+import { CHECKOUT_HOLD_MINUTES, expireUnpaidCheckouts, OrderError, recordPayment } from "./orders";
 import {
   capturePayment,
   checkoutSignatureValid,
@@ -28,11 +28,21 @@ import {
  * the webhook both just ask for that check, so either can arrive first, twice, or not at all.
  */
 
-export type CheckoutSession = { keyId: string; gatewayOrderId: string; amount: number; currency: "INR"; orderNumber: string; prefill: { name: string; email: string; contact: string } };
+export type CheckoutSession = {
+  keyId: string;
+  gatewayOrderId: string;
+  amount: number;
+  currency: "INR";
+  orderNumber: string;
+  prefill: { name: string; email: string; contact: string };
+  /** Seconds until an unpaid checkout's stock hold runs out; Checkout closes itself then. */
+  timeout: number | null;
+};
 
 /** Creates (or reuses) the Razorpay order the customer pays against. Only the order's own customer can start it. */
 export async function startOnlinePayment(customerId: string, orderId: string): Promise<CheckoutSession> {
   if (!razorpayEnabled) throw new OrderError("Online payment isn't available right now.");
+  await expireUnpaidCheckouts();
   const [row] = await db
     .select({ order: schema.orders, user: schema.users })
     .from(schema.orders)
@@ -42,6 +52,7 @@ export async function startOnlinePayment(customerId: string, orderId: string): P
   const { order, user } = row;
   if (order.paymentMethod !== "online") throw new OrderError("This order is paid on delivery.");
   if (order.paymentStatus !== "pending") throw new OrderError("This order is already paid.");
+  if (!order.placedAt && order.status === "cancelled") throw new OrderError("This checkout ran out of time before it was paid, so no order was placed. Your cart is saved: check out again to pay.");
   if (order.status === "cancelled" || order.status === "returned") throw new OrderError("This order is cancelled, so it can't be paid.");
   // Razorpay's minimum charge is ₹1.
   if (order.totalPaise < 100) throw new OrderError("Orders under ₹1 can't be paid online.");
@@ -64,6 +75,7 @@ export async function startOnlinePayment(customerId: string, orderId: string): P
     currency: "INR",
     orderNumber: orderNumber(order.seq),
     prefill: { name: `${user.firstName} ${user.lastName}`.trim(), email: user.email, contact: user.phone?.replace(/\D/g, "").slice(-10) ?? "" },
+    timeout: order.placedAt ? null : Math.max(60, Math.floor((order.createdAt.getTime() + CHECKOUT_HOLD_MINUTES * 60_000 - Date.now()) / 1000)),
   };
 }
 
@@ -117,6 +129,7 @@ export async function confirmOnlinePayment(input: { gatewayOrderId: string; paym
       throw err;
     }
     await notifyAdmins(db, { kind: "order.refund_due", title: `Refund due on ${orderNumber(order.seq)}`, body: `Razorpay payment ${payment.id} arrived after the order was paid or cancelled.`, href: `/admin/orders/${order.id}` });
+    if (!order.placedAt) return { status: "failed", orderId: order.id, message: "The payment arrived after this checkout ran out of time, so no order was placed. The shop will refund it." };
     return { status: "already_paid", orderId: order.id, message: "This order was already paid or cancelled; the shop will refund this payment." };
   }
 
@@ -125,6 +138,8 @@ export async function confirmOnlinePayment(input: { gatewayOrderId: string; paym
   } catch (err) {
     // A webhook and the browser confirming at the same moment: the other one recorded it.
     if (err instanceof OrderError && /already recorded/.test(err.message)) return { status: "already_paid", orderId: order.id, message: "Payment received." };
+    // The checkout expired between the check above and recording: go round again to take the refund path.
+    if (err instanceof OrderError && /cancelled/.test(err.message)) return confirmOnlinePayment({ ...input, signature: null });
     if (isUniqueViolation(err, "payments_gateway_reference_key")) return { status: "already_paid", orderId: order.id, message: "Payment received." };
     throw err;
   }

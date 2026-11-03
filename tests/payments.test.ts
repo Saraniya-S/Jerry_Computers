@@ -5,9 +5,11 @@ import { POST as webhook } from "@/app/api/payments/razorpay/webhook/route";
 import { collectionTotals, listCollections, recordCollection } from "@/lib/server/admin/collections";
 import { createServiceRequest } from "@/lib/server/admin/service-requests";
 import { db, schema } from "@/lib/server/db";
-import { getOrder, placeOrder, recordRefund, updateOrderStatus } from "@/lib/server/orders";
+import { CHECKOUT_HOLD_MINUTES, expireUnpaidCheckouts, getOrder, listCustomerOrders, placeOrder, recordRefund, searchOrders, updateOrderStatus } from "@/lib/server/orders";
 import { applyRefundStatus, approveGatewayRefund, confirmOnlinePayment, startOnlinePayment, syncOnlinePayment } from "@/lib/server/payments";
+import { dashboardMetrics, salesReport } from "@/lib/server/admin/reports";
 import { saveSettings } from "@/lib/server/settings";
+import { istDay } from "@/lib/service-request-form";
 import { installFakeRazorpay } from "./fake-razorpay";
 import { makeProduct, makeUser, reset, walkIn } from "./helpers";
 
@@ -130,13 +132,59 @@ describe("Razorpay payments", () => {
     expect((await syncOnlinePayment(orderId)).status).toBe("paid");
   });
 
-  it("flags money that arrives for a cancelled order as a refund due", async () => {
+  it("places the order only when the payment goes through", async () => {
     const staff = await makeUser("ecommerce_staff");
+    const inbox = () => db.select().from(schema.notifications).where(eq(schema.notifications.userId, staff.id));
+    // Checked out but unpaid: stock is held, the cart stays, and nobody sees an order.
+    expect((await order(orderId)).placedAt).toBeNull();
+    expect(await db.select().from(schema.cartItems).where(eq(schema.cartItems.userId, customer.id))).toHaveLength(1);
+    expect(await inbox()).toHaveLength(0);
+    expect((await searchOrders()).total).toBe(0);
+    expect(await listCustomerOrders(customer.id)).toHaveLength(0);
+    // A failed attempt changes nothing.
     const s = await startOnlinePayment(customer.id, orderId);
-    await updateOrderStatus(orderId, "cancelled", staff.id, { cancelReason: "Out of stock" });
+    expect(s.timeout).toBeGreaterThan(CHECKOUT_HOLD_MINUTES * 60 - 30);
+    const failed = rzp.pay(s.gatewayOrderId, { status: "failed" });
+    expect((await confirmOnlinePayment({ gatewayOrderId: s.gatewayOrderId, paymentId: failed.razorpay_payment_id, signature: failed.razorpay_signature })).status).toBe("failed");
+    expect((await order(orderId)).placedAt).toBeNull();
+    expect((await searchOrders()).total).toBe(0);
+
     const cb = rzp.pay(s.gatewayOrderId);
     await confirmOnlinePayment({ gatewayOrderId: s.gatewayOrderId, paymentId: cb.razorpay_payment_id, signature: cb.razorpay_signature });
+    const placed = await order(orderId);
+    expect(placed).toMatchObject({ status: "confirmed", paymentStatus: "paid" });
+    expect(placed.placedAt).not.toBeNull();
+    expect(await db.select().from(schema.cartItems).where(eq(schema.cartItems.userId, customer.id))).toHaveLength(0);
+    expect(await inbox()).toMatchObject([{ kind: "order.placed" }]);
+    expect((await searchOrders()).rows.map((o) => o.id)).toEqual([orderId]);
+    expect(await listCustomerOrders(customer.id)).toHaveLength(1);
+  });
+
+  it("releases an unpaid checkout's stock when it runs out of time, and refunds a late payment", async () => {
+    const [{ productSlug: slug }] = (await order(orderId)).items;
+    const stock = async () => (await db.select().from(schema.products).where(eq(schema.products.slug, slug)))[0].stock;
+    expect(await stock()).toBe(9);
+    const s = await startOnlinePayment(customer.id, orderId);
+    expect(await expireUnpaidCheckouts()).toBe(0);
+    expect(await expireUnpaidCheckouts(new Date(Date.now() + (CHECKOUT_HOLD_MINUTES + 1) * 60_000))).toBe(1);
+    expect(await order(orderId)).toMatchObject({ status: "cancelled", placedAt: null });
+    expect(await stock()).toBe(10);
+    expect((await searchOrders()).total).toBe(0);
+    await expect(startOnlinePayment(customer.id, orderId)).rejects.toThrow(/ran out of time/);
+
+    // Money that arrives anyway is flagged for a refund, and the checkout shows up for the admin who refunds it.
+    const cb = rzp.pay(s.gatewayOrderId);
+    expect((await confirmOnlinePayment({ gatewayOrderId: s.gatewayOrderId, paymentId: cb.razorpay_payment_id, signature: cb.razorpay_signature })).status).toBe("failed");
     expect((await order(orderId)).paymentStatus).toBe("refund_pending");
+    expect((await searchOrders()).rows.map((o) => o.id)).toEqual([orderId]);
+  });
+
+  it("replaces an earlier unpaid checkout when the customer checks out again", async () => {
+    const [{ productSlug: slug }] = (await order(orderId)).items;
+    const again = await cartOrder(customer, [], "online");
+    expect(await order(orderId)).toMatchObject({ status: "cancelled", cancelReason: "Replaced by a newer checkout" });
+    expect((await order(again.id)).items.map((i) => i.productSlug)).toEqual([slug]);
+    expect((await db.select().from(schema.products).where(eq(schema.products.slug, slug)))[0].stock).toBe(9);
   });
 
   describe("refunds", () => {
@@ -180,6 +228,26 @@ describe("Razorpay payments", () => {
       rzp.state.refundStatus = "processed";
       await approveGatewayRefund(admin.id, orderId);
       expect((await order(orderId)).paymentStatus).toBe("refunded");
+    });
+
+    it("counts only refunds that went through in the dashboard and sales report", async () => {
+      const day = istDay();
+      const total = (await order(orderId)).totalPaise;
+      // Two refused attempts, as Razorpay sometimes does, then one that goes through.
+      rzp.state.failRefund = true;
+      await expect(approveGatewayRefund(admin.id, orderId)).rejects.toThrow();
+      await expect(approveGatewayRefund(admin.id, orderId)).rejects.toThrow();
+      expect((await dashboardMetrics()).money).toMatchObject({ refunded: 0 });
+      expect((await salesReport({ from: day, to: day })).refunds).toEqual({ n: 0, amount: 0 });
+      expect((await order(orderId)).payments.filter((p) => p.kind === "refund").map((p) => p.status)).toEqual(["failed", "failed"]);
+
+      rzp.state.failRefund = false;
+      const r = await approveGatewayRefund(admin.id, orderId);
+      expect(r.amount).toBe(total);
+      expect((await dashboardMetrics()).money).toMatchObject({ refunded: total });
+      const sales = await salesReport({ from: day, to: day });
+      expect(sales.refunds).toEqual({ n: 1, amount: total });
+      expect(sales.net).toBe(0);
     });
   });
 });

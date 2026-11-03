@@ -4,7 +4,7 @@ import { engineerWorkloads } from "@/lib/server/admin/assignment";
 import { addServiceNote, changeServiceStatus, createServiceRequest, decideTransfer, overrideAssignment, requestTransfer, setSchedule } from "@/lib/server/admin/service-requests";
 import { db, schema } from "@/lib/server/db";
 import { engineerSummary, getMyJob, searchMyJobs } from "@/lib/server/engineer/jobs";
-import { locationLinks } from "@/lib/service-location";
+import { locationLinks, parsePastedLocation } from "@/lib/service-location";
 import { makeUser, reset, walkIn } from "./helpers";
 
 type U = Awaited<ReturnType<typeof makeUser>>;
@@ -60,6 +60,20 @@ describe("engineer workspace", () => {
     expect(completions).toHaveLength(1);
   });
 
+  it("lets an engineer complete an accepted or waiting job, but not one they haven't accepted", async () => {
+    await expect(changeServiceStatus(as(a), { requestId: jobId, to: "completed", note: "x" })).rejects.toThrow(/can't become/);
+    await changeServiceStatus(as(a), { requestId: jobId, to: "accepted" });
+    await changeServiceStatus(as(a), { requestId: jobId, to: "completed", note: "Quick fix at the counter" });
+    expect(await job(jobId)).toMatchObject({ status: "completed", resolution: "Quick fix at the counter" });
+
+    const waiting = (await createServiceRequest(admin.id, walkIn())).id;
+    const owner = (await job(waiting)).assignedEngineerId === a.id ? a : b;
+    await changeServiceStatus(as(owner), { requestId: waiting, to: "accepted" });
+    await changeServiceStatus(as(owner), { requestId: waiting, to: "awaiting_customer", note: "Waiting for the password" });
+    await changeServiceStatus(as(owner), { requestId: waiting, to: "completed", note: "Customer shared it; reinstalled" });
+    expect((await job(waiting)).status).toBe("completed");
+  });
+
   it("keeps the work report append-only", async () => {
     await addServiceNote(as(a), { requestId: jobId, kind: "inspection", note: "Port is loose" });
     await addServiceNote(as(a), { requestId: jobId, kind: "diagnosis", note: "Charging IC failed" });
@@ -82,7 +96,7 @@ describe("engineer workspace", () => {
 
   it("only lets engineers request transfers to eligible colleagues, and notifies the outcome", async () => {
     await db.update(schema.engineerProfiles).set({ isAvailable: false }).where(eq(schema.engineerProfiles.userId, b.id));
-    await expect(requestTransfer(a.id, jobId, b.id, "Going on leave")).rejects.toThrow(/marked unavailable/);
+    await expect(requestTransfer(a.id, jobId, b.id, "Going on leave")).rejects.toThrow(/not taking new jobs/);
     await db.update(schema.engineerProfiles).set({ isAvailable: true }).where(eq(schema.engineerProfiles.userId, b.id));
 
     await changeServiceStatus(as(a), { requestId: jobId, to: "accepted" });
@@ -137,5 +151,21 @@ describe("location links", () => {
     expect(locationLinks(null)).toBeNull();
     expect(locationLinks({ ...base, line1: "", postalCode: "" })).toBeNull();
     expect(locationLinks({ ...base, line1: "", latitude: 0, longitude: 0 })).toBeNull();
+  });
+});
+
+describe("pasted customer locations", () => {
+  it("turns coordinates and Google Maps links with coordinates into a pin", () => {
+    expect(parsePastedLocation(" 12.9716, 80.2209 ")).toEqual({ pin: "12.9716, 80.2209", mapsUrl: "" });
+    expect(parsePastedLocation("https://www.google.com/maps/place/Anna+Salai/@13.0604,80.2496,17z/data=!3m1")).toEqual({ pin: "13.0604, 80.2496", mapsUrl: "" });
+    expect(parsePastedLocation("https://www.google.com/maps/place/X/data=!3d13.0612!4d80.2501")).toEqual({ pin: "13.0612, 80.2501", mapsUrl: "" });
+    expect(parsePastedLocation("https://maps.google.com/?q=13.05,80.24")).toEqual({ pin: "13.05, 80.24", mapsUrl: "" });
+  });
+
+  it("keeps share links without coordinates as links, and refuses anything else", () => {
+    expect(parsePastedLocation("https://maps.app.goo.gl/AbC123xyz")).toEqual({ pin: "", mapsUrl: "https://maps.app.goo.gl/AbC123xyz" });
+    expect(parsePastedLocation("near the temple")).toBeNull();
+    expect(parsePastedLocation("javascript:alert(1)")).toBeNull();
+    expect(parsePastedLocation("95, 80")).toBeNull();
   });
 });

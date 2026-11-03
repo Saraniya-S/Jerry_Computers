@@ -3,7 +3,7 @@ import { safeNext } from "@/lib/server/auth";
 import { googleEnabled } from "@/lib/server/env";
 import { GOOGLE_STATE_COOKIE, googleAuthRequest } from "@/lib/server/google";
 
-/** Starts customer Google sign-in. */
+/** Starts Google sign-in (customers, e-commerce staff and admins). */
 export function GET(request: NextRequest) {
   if (!googleEnabled) return NextResponse.redirect(new URL("/login?error=google_unavailable", request.url));
   const { url, cookie } = googleAuthRequest(safeNext(request.nextUrl.searchParams.get("next"), "/account"));

@@ -4,6 +4,9 @@ import { alias } from "drizzle-orm/pg-core";
 import type { ServiceId } from "@/data/services";
 import { deviceForVisual, istDay, onlineRequestInput, PREFERENCE_DAYS, type OnlineRequestInput } from "@/lib/service-request-form";
 import { serviceNumber } from "@/lib/service-desk";
+import { checkVisit, parsePin } from "@/lib/service-location";
+import { visitArea } from "@/lib/settings";
+import { getSettings } from "./settings";
 import { FieldError } from "./admin/catalogue";
 import { createServiceRequest } from "./admin/service-requests";
 import { isUniqueViolation } from "./admin/tx";
@@ -45,6 +48,12 @@ export async function createOnlineServiceRequest(customerId: string, input: Onli
     throw new FieldError(fields);
   }
   const v = parsed.data;
+  // Engineers only travel within the visit area; anywhere else can still bring the device in.
+  if (v.location === "on_site" && v.address) {
+    const addr = v.address as { state?: unknown; postalCode?: unknown; pin?: unknown };
+    const visit = checkVisit(addr, typeof addr.pin === "string" ? parsePin(addr.pin) : null, visitArea(await getSettings("shop")));
+    if (!visit.ok) throw new FieldError({ serviceArea: visit.message });
+  }
 
   const [customer] = await db.select().from(schema.users).where(eq(schema.users.id, customerId));
   if (!customer || customer.role !== "customer") throw new SubmitBlocked("signin", "Sign in with a customer account to request a service.");

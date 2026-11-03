@@ -4,6 +4,7 @@ import { changeServiceStatus, addServiceNote } from "@/lib/server/admin/service-
 import { returnTo } from "@/lib/server/auth";
 import { createOnlineServiceRequest, getMyServiceRequest, listMyServiceRequests, SubmitBlocked } from "@/lib/server/customer-service-requests";
 import { db, schema } from "@/lib/server/db";
+import { saveSettings } from "@/lib/server/settings";
 import { istDay } from "@/lib/service-request-form";
 import { makeUser, reset } from "./helpers";
 
@@ -22,7 +23,7 @@ const base = (over: Record<string, unknown> = {}) => ({
   clientRequestId: id(),
   ...over,
 });
-const onSiteAddress = { label: "Home", recipientName: "Anita", phone: "9876543210", line1: "5 Lake View Road", line2: "", landmark: "", city: "Chennai", state: "Tamil Nadu", postalCode: "600041", mapsUrl: "", pin: "" };
+const onSiteAddress = { label: "Home", recipientName: "Anita", phone: "9876543210", line1: "5 Court Road", line2: "", landmark: "", city: "Nagercoil", state: "Tamil Nadu", postalCode: "629001", mapsUrl: "", pin: "" };
 const job = async (rid: string) => (await db.select().from(schema.serviceRequests).where(eq(schema.serviceRequests.id, rid)))[0];
 
 describe("online service requests", () => {
@@ -93,12 +94,35 @@ describe("online service requests", () => {
 
   it("needs an address on-site, keeps a shared pin, and never needs one in-shop", async () => {
     await expect(createOnlineServiceRequest(customer.id, base({ location: "on_site" }))).rejects.toMatchObject({ fields: { address: expect.any(String) } });
-    const res = await createOnlineServiceRequest(customer.id, base({ location: "on_site", serviceSlug: "cctv-installation", problemType: "Maintenance visits", address: { ...onSiteAddress, pin: "13.041800, 80.234100" } }));
+    const res = await createOnlineServiceRequest(customer.id, base({ location: "on_site", serviceSlug: "cctv-installation", problemType: "Maintenance visits", address: { ...onSiteAddress, pin: "8.177800, 77.434400" } }));
     const row = await job(res.id);
     expect(row.deviceType).toBe("cctv");
-    expect(row.serviceAddress).toMatchObject({ city: "Chennai", latitude: 13.0418, longitude: 80.2341 });
+    expect(row.serviceAddress).toMatchObject({ city: "Nagercoil", latitude: 8.1778, longitude: 77.4344 });
     const noPin = await createOnlineServiceRequest(customer.id, base({ location: "on_site", address: onSiteAddress }));
     expect((await job(noPin.id)).serviceAddress).toMatchObject({ latitude: null, longitude: null });
+  });
+
+  it("visits Kanniyakumari district, and outside it only within 20 km of the shop", async () => {
+    const outside = { ...onSiteAddress, city: "Chennai", postalCode: "600041" };
+    // Outside the district with no location to measure: ask for one.
+    await expect(createOnlineServiceRequest(customer.id, base({ location: "on_site", address: outside }))).rejects.toMatchObject({ fields: { serviceArea: expect.stringMatching(/share your location/) } });
+    // Right PIN but another state is still outside.
+    await expect(createOnlineServiceRequest(customer.id, base({ location: "on_site", address: { ...onSiteAddress, state: "Kerala" } }))).rejects.toMatchObject({ fields: { serviceArea: expect.any(String) } });
+    // Far away: refused with the distance.
+    await expect(createOnlineServiceRequest(customer.id, base({ location: "on_site", address: { ...outside, pin: "13.0418, 80.2341" } }))).rejects.toMatchObject({ fields: { serviceArea: expect.stringMatching(/about 6\d\d km/) } });
+    expect(await db.select().from(schema.serviceRequests)).toHaveLength(0);
+
+    for (const [city, pin] of [["Marthandam", "629165"], ["Neyoor", "629802"], ["Kanniyakumari", "629702"]]) {
+      await createOnlineServiceRequest(customer.id, base({ location: "on_site", address: { ...onSiteAddress, city, postalCode: pin }, clientRequestId: id() }));
+    }
+    // Across the border in Kerala, but about 12 km from the shop.
+    await createOnlineServiceRequest(customer.id, base({ location: "on_site", address: { ...onSiteAddress, city: "Kaliyikkavila", state: "Kerala", postalCode: "695502", pin: "8.3000, 77.2500" }, clientRequestId: id() }));
+    await createOnlineServiceRequest(customer.id, base({ location: "in_shop" }));
+    expect(await db.select().from(schema.serviceRequests)).toHaveLength(5);
+
+    // With the radius set to 0 the district is the only area.
+    await saveSettings("shop", { visitRadiusKm: 0 }, customer.id);
+    await expect(createOnlineServiceRequest(customer.id, base({ location: "on_site", address: { ...onSiteAddress, state: "Kerala", postalCode: "695502", pin: "8.3000, 77.2500" }, clientRequestId: id() }))).rejects.toMatchObject({ fields: { serviceArea: expect.stringMatching(/only available in Kanniyakumari district/) } });
   });
 
   it("shows customers only their own requests, with status changes but no staff notes", async () => {

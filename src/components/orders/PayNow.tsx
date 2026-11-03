@@ -36,8 +36,9 @@ type State = { kind: "idle" } | { kind: "busy"; text: string } | { kind: "done";
 /**
  * Pays an online order with Razorpay Checkout. The server creates the Razorpay order and, after
  * Checkout returns, verifies the signature and asks Razorpay before the order is marked paid.
+ * `checkout` is an unpaid checkout: it only becomes an order once this payment goes through.
  */
-export function PayNow({ orderId, amountLabel, autoStart = false }: { orderId: string; amountLabel: string; autoStart?: boolean }) {
+export function PayNow({ orderId, amountLabel, autoStart = false, checkout = false }: { orderId: string; amountLabel: string; autoStart?: boolean; checkout?: boolean }) {
   const [state, setState] = useState<State>({ kind: "idle" });
   const started = useRef(false);
 
@@ -56,12 +57,13 @@ export function PayNow({ orderId, amountLabel, autoStart = false }: { orderId: s
       description: `Order ${s.orderNumber}`,
       prefill: s.prefill,
       theme: { color: "#372f63" },
+      ...(s.timeout ? { timeout: s.timeout } : {}),
       handler: async (r: RazorpayResponse) => {
         setState({ kind: "busy", text: "Confirming your payment with Razorpay…" });
         const res = await confirmPaymentAction(orderId, r);
-        setState(res.status === "paid" || res.status === "already_paid" ? { kind: "done", text: "Payment received. Your invoice is on its way by email." } : res.status === "pending" ? { kind: "info", text: res.message } : { kind: "error", text: res.message });
+        setState(res.status === "paid" || res.status === "already_paid" ? { kind: "done", text: checkout ? "Payment received and your order is placed. Your invoice is on its way by email." : "Payment received. Your invoice is on its way by email." } : res.status === "pending" ? { kind: "info", text: res.message } : { kind: "error", text: res.message });
       },
-      modal: { ondismiss: () => setState((cur) => (cur.kind === "busy" && cur.text === WAITING ? { kind: "info", text: "Payment not completed. You can pay any time from this page." } : cur)) },
+      modal: { ondismiss: () => setState((cur) => (cur.kind === "busy" && cur.text === WAITING ? { kind: "info", text: checkout ? "Payment not completed, so your order hasn't been placed. Your cart is saved; you can pay from this page." : "Payment not completed. You can pay any time from this page." } : cur)) },
     });
     rzp.on("payment.failed", (r) => setState({ kind: "error", text: r.error?.description ? `Payment failed: ${r.error.description}` : "Payment failed. You can try again." }));
     rzp.open();
@@ -81,7 +83,9 @@ export function PayNow({ orderId, amountLabel, autoStart = false }: { orderId: s
     <div className="grid gap-3 rounded-xl border border-brand/20 bg-brand/[0.04] p-4">
       <div>
         <p className="font-medium text-fg">Payment due: {amountLabel}</p>
-        <p className="mt-0.5 text-sm text-fg-muted">Pay by UPI, card, net banking or wallet through Razorpay. We start packing once it&apos;s received.</p>
+        <p className="mt-0.5 text-sm text-fg-muted">
+          Pay by UPI, card, net banking or wallet through Razorpay. {checkout ? "Your order is placed once the payment goes through." : "We start packing once it's received."}
+        </p>
       </div>
       {(state.kind === "error" || state.kind === "info") && <FormAlert tone={state.kind === "error" ? "error" : "info"}>{state.text}</FormAlert>}
       <button

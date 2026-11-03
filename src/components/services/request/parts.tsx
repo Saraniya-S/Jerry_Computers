@@ -23,6 +23,7 @@ import {
 import { createElement, useState, type ReactNode } from "react";
 import { AddressFields, type AddressDraft } from "@/components/forms/AddressFields";
 import { SelectField, TextField } from "@/components/forms/controls";
+import { inServiceArea, ROUGH_FIX_METRES, SERVICE_AREA, visitAreaText, type VisitArea } from "@/lib/service-location";
 import { istDay, PREFERENCE_DAYS, preferredWindows } from "@/lib/service-request-form";
 import type { SubmittedRequest } from "@/lib/server/customer-service-requests";
 import { OTHER, STEPS, type Draft, type RequestAccount, type RequestService, type ShopInfo } from "./types";
@@ -232,8 +233,10 @@ export function DeviceStep({ service, draft, set, errors }: { service: RequestSe
 
 type LocState = { status: "idle" } | { status: "asking" } | { status: "shared" } | { status: "error"; message: string };
 
+const km = (m: number) => (m >= 10_000 ? `${Math.round(m / 1000)} km` : `${(m / 1000).toFixed(1)} km`);
+
 /** Step 3: on-site (address, optional live location) or in-shop (shop details), plus an optional preferred time. */
-export function MethodStep({ draft, set, errors, account, shop }: { draft: Draft; set: Set; errors: Errors; account: RequestAccount | null; shop: ShopInfo | null }) {
+export function MethodStep({ draft, set, errors, account, shop, visitArea }: { draft: Draft; set: Set; errors: Errors; account: RequestAccount | null; shop: ShopInfo | null; visitArea: VisitArea }) {
   const [loc, setLoc] = useState<LocState>(draft.pin ? { status: "shared" } : { status: "idle" });
   // The days a preference can fall on, fixed when the step opens.
   const [{ today, last }] = useState(() => {
@@ -250,6 +253,17 @@ export function MethodStep({ draft, set, errors, account, shop }: { draft: Draft
     setLoc({ status: "asking" });
     navigator.geolocation.getCurrentPosition(
       (pos) => {
+        // Laptops and desktops have no GPS; without Wi-Fi positioning the browser falls back to the
+        // internet provider's location, often far from the customer. Don't send that as a pin.
+        if (pos.coords.accuracy > ROUGH_FIX_METRES) {
+          set("pin", "");
+          set("pinAccuracy", null);
+          setLoc({
+            status: "error",
+            message: `This device could only guess your location from its internet connection (it could be off by about ${km(pos.coords.accuracy)}), so we haven't used it. Paste your location from Google Maps on your phone below, or just enter the address.`,
+          });
+          return;
+        }
         set("pin", `${pos.coords.latitude.toFixed(6)}, ${pos.coords.longitude.toFixed(6)}`);
         set("pinAccuracy", Math.round(pos.coords.accuracy));
         setLoc({ status: "shared" });
@@ -265,12 +279,13 @@ export function MethodStep({ draft, set, errors, account, shop }: { draft: Draft
               : "We couldn't get your location just now. Enter the address below instead.",
         });
       },
-      { enableHighAccuracy: true, timeout: 15_000, maximumAge: 60_000 },
+      // Always a fresh reading: a cached one may be from another network or the rough fallback.
+      { enableHighAccuracy: true, timeout: 20_000, maximumAge: 0 },
     );
   }
 
   const methods = [
-    { value: "on_site" as const, icon: MapPin, title: "On-site service", body: "An engineer comes to your home or office." },
+    { value: "on_site" as const, icon: MapPin, title: "On-site service", body: `An engineer comes to your home or office: ${visitAreaText(visitArea)}.` },
     { value: "in_shop" as const, icon: Store, title: "In-shop service", body: "You bring the device to our shop." },
   ];
 
@@ -311,7 +326,18 @@ export function MethodStep({ draft, set, errors, account, shop }: { draft: Draft
       </Section>
 
       {draft.location === "on_site" && (
-        <Section title="Where should the engineer come?">
+        <Section
+          title="Where should the engineer come?"
+          description={`Our engineers visit addresses in ${SERVICE_AREA.name} (PIN codes starting ${SERVICE_AREA.pinPrefix})${visitArea.shop && visitArea.radiusKm > 0 ? `, and up to ${visitArea.radiusKm} km from our shop outside it: share your location below for those` : ""}.`}
+        >
+          {errors.serviceArea && (
+            <p id="service-area-msg" role="alert" className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+              {errors.serviceArea}{" "}
+              <button type="button" onClick={() => set("location", "in_shop")} className="font-medium underline underline-offset-4">
+                Switch to in-shop service
+              </button>
+            </p>
+          )}
           {account && account.addresses.length > 0 && (
             <div role="radiogroup" aria-label="Service address" className="grid gap-2">
               {account.addresses.map((a) => (
@@ -323,6 +349,7 @@ export function MethodStep({ draft, set, errors, account, shop }: { draft: Draft
                       {a.isDefault && <span className="ml-1.5 text-xs font-normal text-fg-dim">default</span>}
                     </span>
                     <span className="block text-fg-muted">{[a.line1, a.line2, a.city, `${a.state} ${a.postalCode}`].filter(Boolean).join(", ")}</span>
+                    {!inServiceArea(a) && <span className="mt-0.5 block text-xs text-amber-800">Outside {SERVICE_AREA.name}{visitArea.shop && visitArea.radiusKm > 0 ? ": share your location to check the distance" : ""}</span>}
                   </span>
                 </label>
               ))}
@@ -373,6 +400,21 @@ export function MethodStep({ draft, set, errors, account, shop }: { draft: Draft
               )}
               {loc.status === "error" && <p className="mt-3 text-[0.8rem] text-amber-800">{loc.message}</p>}
             </div>
+            {!draft.pin && (
+              <div className="mt-4">
+                <TextField
+                  label="Or paste your location"
+                  optional
+                  value={draft.pastedLocation}
+                  onChange={(e) => set("pastedLocation", e.target.value)}
+                  maxLength={500}
+                  inputMode="url"
+                  placeholder="https://maps.app.goo.gl/… or 12.9716, 80.2209"
+                  hint="In Google Maps, tap your blue dot or drop a pin, then Share → Copy link."
+                  error={errors.pastedLocation}
+                />
+              </div>
+            )}
           </div>
         </Section>
       )}

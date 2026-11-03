@@ -1,11 +1,17 @@
 import Link from "next/link";
-import { ArrowRight, ArrowUpRight, BadgeCheck, CalendarDays, KeyRound, MapPin, Package, ShoppingBag, Sparkles, Truck, Wrench } from "lucide-react";
+import { ArrowRight, ArrowUpRight, BadgeCheck, CalendarDays, ChevronRight, KeyRound, MapPin, Package, ShoppingBag, Sparkles, Store, Truck, Wrench } from "lucide-react";
 import { Suspense } from "react";
 import { outlineButton, primaryButton } from "@/components/account/buttons";
 import { EmptyState, PageHeader, PageSkeleton } from "@/components/account/PageHeader";
+import { PaymentBadge, StatusBadge } from "@/components/orders/OrderParts";
 import { productCategories } from "@/data/products";
+import { formatPaise, orderNumber } from "@/lib/money";
 import { requireCustomer } from "@/lib/server/auth";
 import { listAddresses } from "@/lib/server/customer";
+import { listMyServiceRequests } from "@/lib/server/customer-service-requests";
+import { listCustomerOrders } from "@/lib/server/orders";
+import { deviceTypeLabel, serviceNumber } from "@/lib/service-desk";
+import { customerStatusLabel } from "@/lib/service-request-form";
 
 export default function AccountOverviewPage() {
   return (
@@ -15,28 +21,21 @@ export default function AccountOverviewPage() {
   );
 }
 
-const dateFmt = new Intl.DateTimeFormat("en-IN", { day: "numeric", month: "short", year: "numeric" });
+const dateFmt = new Intl.DateTimeFormat("en-IN", { day: "numeric", month: "short", year: "numeric", timeZone: "Asia/Kolkata" });
+/** How many of each the overview shows; the full lists are a click away. */
+const RECENT = 5;
 
 async function Overview() {
   const viewer = await requireCustomer();
   const methods = [viewer.hasPassword && "Email & password", viewer.hasGoogle && "Google"].filter(Boolean).join(" · ");
-  const primary = (await listAddresses(viewer.id)).find((a) => a.isDefault);
+  const [addresses, orders, requests] = await Promise.all([listAddresses(viewer.id), listCustomerOrders(viewer.id), listMyServiceRequests(viewer.id)]);
+  const primary = addresses.find((a) => a.isDefault);
 
   return (
     <>
       <PageHeader
         title={`Welcome, ${viewer.firstName}`}
         description="Your orders, repairs and account in one place."
-        actions={
-          <>
-            <Link href="/products" className={outlineButton}>
-              <ShoppingBag className="size-4" aria-hidden /> Shop
-            </Link>
-            <Link href="/services/request" className={primaryButton}>
-              <Wrench className="size-4" aria-hidden /> Book a service
-            </Link>
-          </>
-        }
       />
 
       {!viewer.onboardedAt && (
@@ -77,19 +76,68 @@ async function Overview() {
 
       <div className="grid gap-4 px-5 pb-7 sm:px-7 xl:grid-cols-[1fr_340px]">
         <div className="grid gap-4">
-          <Panel title="Recent orders" href="/account/orders">
-            <EmptyState icon={<Package className="size-5" aria-hidden />} title="No orders yet" action={<Link href="/products" className={outlineButton}>Browse products</Link>}>
-              When you order from the store, its status and courier tracking will show here.
-            </EmptyState>
+          <Panel title="Recent orders" href="/account/orders" linkLabel={orders.length > RECENT ? `View all ${orders.length}` : "View all"}>
+            {orders.length ? (
+              <ul className="divide-y divide-line">
+                {orders.slice(0, RECENT).map((o) => {
+                  const items = o.items.reduce((n, i) => n + i.quantity, 0);
+                  return (
+                    <ListRow key={o.id} href={`/account/orders/${o.id}`}>
+                      <span className="min-w-0 flex-1">
+                        <span className="block font-medium text-fg group-hover:text-brand">{orderNumber(o.seq)}</span>
+                        <span className="block truncate text-xs text-fg-dim">
+                          {dateFmt.format(o.placedAt ?? o.createdAt)} · {items} item{items === 1 ? "" : "s"}
+                          {o.items[0] && ` · ${o.items[0].productName}${o.items.length > 1 ? ` +${o.items.length - 1} more` : ""}`}
+                        </span>
+                      </span>
+                      <span className="flex shrink-0 flex-wrap items-center justify-end gap-1.5">
+                        <StatusBadge status={o.status} />
+                        <PaymentBadge status={o.paymentStatus} />
+                        <span className="w-20 text-right text-sm tabular-nums text-fg">{formatPaise(o.totalPaise)}</span>
+                      </span>
+                    </ListRow>
+                  );
+                })}
+              </ul>
+            ) : (
+              <EmptyState icon={<Package className="size-5" aria-hidden />} title="No orders yet" action={<Link href="/products" className={outlineButton}>Browse products</Link>}>
+                When you order from the store, its status and courier tracking will show here.
+              </EmptyState>
+            )}
           </Panel>
-          <Panel title="Service requests" href="/account/services">
-            <EmptyState
-              icon={<Wrench className="size-5" aria-hidden />}
-              title="No service requests"
-              action={<Link href="/services/request" className={outlineButton}>Book a service</Link>}
-            >
-              Track repairs from drop-off or engineer visit through to pickup.
-            </EmptyState>
+          <Panel title="Service requests" href="/account/services" linkLabel={requests.length > RECENT ? `View all ${requests.length}` : "View all"}>
+            {requests.length ? (
+              <ul className="divide-y divide-line">
+                {requests.slice(0, RECENT).map(({ r, serviceLabel }) => (
+                  <ListRow key={r.id} href={`/account/services/${r.id}`}>
+                    <span className="min-w-0 flex-1">
+                      <span className="block font-medium text-fg group-hover:text-brand">
+                        {serviceNumber(r.seq)} <span className="font-normal text-fg-muted">· {serviceLabel ?? deviceTypeLabel[r.deviceType]}</span>
+                      </span>
+                      <span className="flex items-center gap-1.5 truncate text-xs text-fg-dim">
+                        {r.location === "on_site" ? <MapPin className="size-3 shrink-0" aria-hidden /> : <Store className="size-3 shrink-0" aria-hidden />}
+                        {dateFmt.format(r.createdAt)} · {[r.deviceBrand, r.deviceModel].filter(Boolean).join(" ") || deviceTypeLabel[r.deviceType]}
+                      </span>
+                    </span>
+                    <span
+                      className={`inline-flex shrink-0 items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
+                        r.status === "completed" ? "bg-mint-soft text-leaf" : r.status === "cancelled" ? "bg-ink-900 text-fg-dim" : r.status === "awaiting_customer" ? "bg-amber-100 text-amber-800" : "bg-brand/10 text-brand"
+                      }`}
+                    >
+                      {customerStatusLabel[r.status]}
+                    </span>
+                  </ListRow>
+                ))}
+              </ul>
+            ) : (
+              <EmptyState
+                icon={<Wrench className="size-5" aria-hidden />}
+                title="No service requests"
+                action={<Link href="/services/request" className={outlineButton}>Book a service</Link>}
+              >
+                Track repairs from drop-off or engineer visit through to pickup.
+              </EmptyState>
+            )}
           </Panel>
         </div>
 
@@ -167,6 +215,17 @@ function Panel({ title, href, linkLabel = "View all", children }: { title: strin
       </div>
       {children}
     </section>
+  );
+}
+
+function ListRow({ href, children }: { href: string; children: React.ReactNode }) {
+  return (
+    <li>
+      <Link href={href} className="group flex items-center justify-between gap-3 px-4 py-3 text-sm transition-colors hover:bg-ink-950">
+        {children}
+        <ChevronRight className="size-4 shrink-0 text-fg-dim group-hover:text-brand" aria-hidden />
+      </Link>
+    </li>
   );
 }
 

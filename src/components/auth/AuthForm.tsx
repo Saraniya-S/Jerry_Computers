@@ -30,7 +30,9 @@ const queryErrors: Record<string, string> = {
   google_unavailable: "Google sign-in isn't set up yet. Use your email and password.",
   google_failed: "Google sign-in didn't complete. Please try again.",
   google_unverified: "That Google account's email isn't verified with Google.",
-  google_staff: "Staff, engineer and admin accounts sign in with email and password.",
+  google_staff: "Engineer accounts sign in with email and password.",
+  google_invite: "Accept your invite first: set a password from the invite email, then you can also use Google.",
+  google_mismatch: "This account is linked to a different Google account. Use that one, or your email and password.",
   account_disabled: "This account has been switched off. Contact the shop if you think that's a mistake.",
 };
 

@@ -2,6 +2,7 @@
 
 import { LoaderCircle } from "lucide-react";
 import { useEffect, useId, useRef, useState, useTransition, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { FormAlert } from "@/components/auth/ui";
 import type { ActionResult } from "@/lib/admin/result";
 
@@ -65,7 +66,6 @@ export function ConfirmDialog({
 
   useEffect(() => {
     if (open && !ref.current?.open) ref.current?.showModal();
-    if (!open) ref.current?.close();
   }, [open]);
 
   return (
@@ -75,6 +75,9 @@ export function ConfirmDialog({
         setResult(null);
         setOpen(true);
       })}
+      {/* Rendered into <body> only while open, so its form is never nested in the trigger's form. */}
+      {open &&
+        createPortal(
       <dialog
         ref={ref}
         onClose={() => setOpen(false)}
@@ -86,6 +89,8 @@ export function ConfirmDialog({
           className="grid gap-4 p-5"
           onSubmit={(e) => {
             e.preventDefault();
+            // React bubbles portal events through the component tree, so keep this submit from reaching a surrounding form.
+            e.stopPropagation();
             run("confirm", () => onConfirm(text.trim()), (r) => r.ok && setOpen(false));
           }}
         >
@@ -117,7 +122,9 @@ export function ConfirmDialog({
             </button>
           </div>
         </form>
-      </dialog>
+      </dialog>,
+          document.body,
+        )}
     </>
   );
 }

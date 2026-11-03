@@ -3,6 +3,7 @@ import { alias } from "drizzle-orm/pg-core";
 import { and, count, desc, eq, gte, isNull, lt, ne, notInArray, sql } from "drizzle-orm";
 import { OPEN_FOR_ADMIN_STATUSES } from "@/lib/service-desk";
 import { db, schema } from "../db";
+import { isPlaced } from "../orders";
 import type { DeviceType, OrderStatus, ServiceStatus } from "../db/schema";
 import { collectionTotals } from "./collections";
 import { listEngineers } from "./engineers";
@@ -13,7 +14,7 @@ const sum = (col: unknown) => sql<number>`coalesce(sum(${col}), 0)::int`;
 export async function dashboardMetrics() {
   const monthStart = sql`date_trunc('month', now() at time zone 'Asia/Kolkata') at time zone 'Asia/Kolkata'`;
   const [orderRows, [products], [customers], [money], serviceRows, [engineers], [transfers]] = await Promise.all([
-    db.select({ status: schema.orders.status, n: count() }).from(schema.orders).groupBy(schema.orders.status),
+    db.select({ status: schema.orders.status, n: count() }).from(schema.orders).where(isPlaced).groupBy(schema.orders.status),
     db
       .select({
         live: sql<number>`count(*) filter (where ${schema.products.isActive})::int`,
@@ -25,7 +26,7 @@ export async function dashboardMetrics() {
     db
       .select({
         active: sql<number>`count(*) filter (where ${schema.users.disabledAt} is null)::int`,
-        ordered90: sql<number>`count(*) filter (where exists (select 1 from ${schema.orders} o where o.user_id = ${schema.users.id} and o.created_at >= now() - interval '90 days'))::int`,
+        ordered90: sql<number>`count(*) filter (where exists (select 1 from ${schema.orders} o where o.user_id = ${schema.users.id} and (o.placed_at is not null or o.payment_status <> 'pending') and o.created_at >= now() - interval '90 days'))::int`,
       })
       .from(schema.users)
       .where(eq(schema.users.role, "customer")),
@@ -35,12 +36,14 @@ export async function dashboardMetrics() {
         refunded: sql<number>`coalesce(sum(${schema.payments.amountPaise}) filter (where ${schema.payments.kind} = 'refund' and ${schema.payments.createdAt} >= ${monthStart}), 0)::int`,
         payments: sql<number>`count(*) filter (where ${schema.payments.kind} = 'payment' and ${schema.payments.createdAt} >= ${monthStart})::int`,
       })
-      .from(schema.payments),
+      .from(schema.payments)
+      // Only money that actually moved: a failed or still-processing refund hasn't gone back yet.
+      .where(eq(schema.payments.status, "succeeded")),
     db.select({ status: schema.serviceRequests.status, n: count() }).from(schema.serviceRequests).groupBy(schema.serviceRequests.status),
     db
       .select({
         total: count(),
-        available: sql<number>`count(*) filter (where ${schema.users.disabledAt} is null and ${schema.users.passwordHash} is not null and coalesce(${schema.engineerProfiles.isAvailable}, true))::int`,
+        available: sql<number>`count(*) filter (where ${schema.users.disabledAt} is null and ${schema.users.passwordHash} is not null and coalesce(${schema.engineerProfiles.isAvailable}, true) and not exists (select 1 from ${schema.engineerLeave} l where l.engineer_id = ${schema.users.id} and l.status = 'approved' and (now() at time zone 'Asia/Kolkata')::date between l.starts_on and l.ends_on))::int`,
       })
       .from(schema.users)
       .leftJoin(schema.engineerProfiles, eq(schema.engineerProfiles.userId, schema.users.id))
@@ -50,7 +53,7 @@ export async function dashboardMetrics() {
   const [unpaid] = await db
     .select({ n: count(), value: sum(schema.orders.totalPaise) })
     .from(schema.orders)
-    .where(and(eq(schema.orders.paymentStatus, "pending"), notInArray(schema.orders.status, ["cancelled", "returned"])));
+    .where(and(isPlaced, eq(schema.orders.paymentStatus, "pending"), notInArray(schema.orders.status, ["cancelled", "returned"])));
 
   const orders = Object.fromEntries(orderRows.map((r) => [r.status, r.n])) as Partial<Record<OrderStatus, number>>;
   const services = Object.fromEntries(serviceRows.map((r) => [r.status, r.n])) as Partial<Record<ServiceStatus, number>>;
@@ -99,11 +102,11 @@ const endExclusive = (d: string) => new Date(start(d).getTime() + 86_400_000);
 export async function salesReport(r: Range) {
   const inRange = (col: Parameters<typeof gte>[0]) => and(gte(col, start(r.from)), lt(col, endExclusive(r.to)));
   const [byMethod, booked, statusRows, topProducts, outstanding] = await Promise.all([
-    // Money that actually moved, from payment records.
+    // Money that actually moved, from payment records (failed and still-processing refunds excluded).
     db
       .select({ kind: schema.payments.kind, method: schema.payments.method, n: count(), amount: sum(schema.payments.amountPaise) })
       .from(schema.payments)
-      .where(inRange(schema.payments.createdAt))
+      .where(and(inRange(schema.payments.createdAt), eq(schema.payments.status, "succeeded")))
       .groupBy(schema.payments.kind, schema.payments.method),
     // Orders placed in the range (whether or not paid yet).
     db
@@ -114,13 +117,13 @@ export async function salesReport(r: Range) {
         cancelledValue: sql<number>`coalesce(sum(${schema.orders.totalPaise}) filter (where ${schema.orders.status} = 'cancelled'), 0)::int`,
       })
       .from(schema.orders)
-      .where(inRange(schema.orders.createdAt)),
-    db.select({ status: schema.orders.status, n: count(), value: sum(schema.orders.totalPaise) }).from(schema.orders).where(inRange(schema.orders.createdAt)).groupBy(schema.orders.status),
+      .where(and(isPlaced, inRange(schema.orders.createdAt))),
+    db.select({ status: schema.orders.status, n: count(), value: sum(schema.orders.totalPaise) }).from(schema.orders).where(and(isPlaced, inRange(schema.orders.createdAt))).groupBy(schema.orders.status),
     db
       .select({ name: schema.orderItems.productName, slug: schema.orderItems.productSlug, units: sum(schema.orderItems.quantity), value: sql<number>`coalesce(sum(${schema.orderItems.quantity} * ${schema.orderItems.unitPricePaise}), 0)::int` })
       .from(schema.orderItems)
       .innerJoin(schema.orders, eq(schema.orders.id, schema.orderItems.orderId))
-      .where(and(inRange(schema.orders.createdAt), ne(schema.orders.status, "cancelled")))
+      .where(and(isPlaced, inRange(schema.orders.createdAt), ne(schema.orders.status, "cancelled")))
       .groupBy(schema.orderItems.productName, schema.orderItems.productSlug)
       .orderBy(desc(sql`sum(${schema.orderItems.quantity})`))
       .limit(10),
@@ -134,7 +137,8 @@ export async function salesReport(r: Range) {
         refundDue: sql<number>`coalesce(sum(${schema.orders.totalPaise}) filter (where ${schema.orders.paymentStatus} = 'refund_pending'), 0)::int`,
         refundDueN: sql<number>`count(*) filter (where ${schema.orders.paymentStatus} = 'refund_pending')::int`,
       })
-      .from(schema.orders),
+      .from(schema.orders)
+      .where(isPlaced),
   ]);
   const pick = (kind: "payment" | "refund", method?: "cod" | "online") =>
     byMethod.filter((m) => m.kind === kind && (!method || m.method === method)).reduce((a, m) => ({ n: a.n + m.n, amount: a.amount + m.amount }), { n: 0, amount: 0 });

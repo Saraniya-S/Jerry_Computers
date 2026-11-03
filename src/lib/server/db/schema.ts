@@ -27,7 +27,7 @@ export const users = pgTable(
     phone: text("phone"),
     /** Null for accounts that only sign in with Google. */
     passwordHash: text("password_hash"),
-    /** Google's stable account id, for customers who use Google sign-in. */
+    /** Google's stable account id, once a customer, e-commerce staff member or admin signs in with Google. */
     googleSub: text("google_sub"),
     emailVerifiedAt: timestamp("email_verified_at", { withTimezone: true }),
     failedLogins: integer("failed_logins").notNull().default(0),
@@ -177,6 +177,12 @@ export const orders = pgTable(
     trackingNumber: text("tracking_number"),
     cancelledAt: timestamp("cancelled_at", { withTimezone: true }),
     cancelReason: text("cancel_reason"),
+    /**
+     * When the order was really placed: at checkout for cash on delivery, when Razorpay confirms the
+     * payment for online orders. Null means an online checkout that hasn't been paid: its stock is
+     * held for a short while, but it isn't an order yet and staff never see it.
+     */
+    placedAt: timestamp("placed_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true })
       .notNull()
@@ -185,6 +191,7 @@ export const orders = pgTable(
   },
   (t) => [
     uniqueIndex("orders_seq_key").on(t.seq),
+    index("orders_unpaid_checkout_idx").on(t.createdAt).where(sql`${t.placedAt} is null`),
     uniqueIndex("orders_gateway_order_key").on(t.gatewayOrderId).where(sql`${t.gatewayOrderId} is not null`),
     index("orders_user_id_idx").on(t.userId),
     index("orders_status_idx").on(t.status),
@@ -599,6 +606,59 @@ export const engineerProfiles = pgTable("engineer_profiles", {
     .defaultNow()
     .$onUpdate(() => new Date()),
 });
+
+/**
+ * Extra engineers working a job alongside its lead (the assigned engineer), for work that needs
+ * more than one person. Helpers see the job and add to its work report; the lead keeps the
+ * status, schedule, payments and transfers. removedAt marks someone who left the team.
+ */
+export const serviceJobHelpers = pgTable(
+  "service_job_helpers",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    requestId: uuid("request_id")
+      .notNull()
+      .references(() => serviceRequests.id, { onDelete: "cascade" }),
+    engineerId: uuid("engineer_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    addedById: uuid("added_by_id").references(() => users.id, { onDelete: "set null" }),
+    reason: text("reason").notNull().default(""),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    removedAt: timestamp("removed_at", { withTimezone: true }),
+  },
+  (t) => [
+    uniqueIndex("service_job_helpers_active_key").on(t.requestId, t.engineerId).where(sql`${t.removedAt} is null`),
+    index("service_job_helpers_engineer_idx").on(t.engineerId).where(sql`${t.removedAt} is null`),
+  ],
+);
+
+export const leaveStatus = pgEnum("leave_status", ["pending", "approved", "rejected"]);
+
+/**
+ * Days an engineer asks to be away (both dates included, shop time). An admin approves or rejects
+ * the request; while approved leave covers today, automatic assignment skips them. The jobs they
+ * already have stay with them.
+ */
+export const engineerLeave = pgTable(
+  "engineer_leave",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    engineerId: uuid("engineer_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    startsOn: date("starts_on").notNull(),
+    endsOn: date("ends_on").notNull(),
+    reason: text("reason").notNull().default(""),
+    status: leaveStatus("status").notNull().default("pending"),
+    decidedById: uuid("decided_by_id").references(() => users.id, { onDelete: "set null" }),
+    decidedAt: timestamp("decided_at", { withTimezone: true }),
+    decisionNote: text("decision_note"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("engineer_leave_status_idx").on(t.status), index("engineer_leave_engineer_idx").on(t.engineerId, t.endsOn), check("engineer_leave_dates_check", sql`${t.endsOn} >= ${t.startsOn}`)],
+);
+export type EngineerLeave = typeof engineerLeave.$inferSelect;
 
 /** latitude/longitude are set only when a real pin was captured; never guessed from the address. */
 export type ServiceAddress = AddressSnapshot & { mapsUrl: string | null; latitude?: number | null; longitude?: number | null };

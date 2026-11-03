@@ -11,6 +11,7 @@ import { PriorityBadge, ServiceStatusBadge } from "@/components/admin/ServiceBad
 import { Badge, dateTimeFmt, fullDateTimeFmt, Panel, Table, td } from "@/components/admin/ui";
 import { engineerWorkloads } from "@/lib/server/admin/assignment";
 import { listTransfers } from "@/lib/server/admin/service-requests";
+import { leaveDates, upcomingLeave } from "@/lib/server/engineer/leave";
 import { db, schema } from "@/lib/server/db";
 import { requirePermission } from "@/lib/server/permissions";
 import { ACTIVE_SERVICE_STATUSES, deviceTypeLabel, serviceNumber } from "@/lib/service-desk";
@@ -35,7 +36,7 @@ async function Engineer({ params }: Pick<PageProps<"/admin/engineers/[id]">, "pa
   if (!e) notFound();
   const r = schema.serviceRequests;
   const job = alias(schema.serviceRequests, "job");
-  const [[profile], active, completed, transfers, history] = await Promise.all([
+  const [[profile], active, completed, transfers, history, leave] = await Promise.all([
     db.select().from(schema.engineerProfiles).where(eq(schema.engineerProfiles.userId, id)),
     db.select().from(r).where(and(eq(r.assignedEngineerId, id), inArray(r.status, ACTIVE_SERVICE_STATUSES))).orderBy(desc(r.priority), r.createdAt),
     db.select().from(r).where(and(eq(r.assignedEngineerId, id), eq(r.status, "completed"))).orderBy(desc(r.completedAt)).limit(20),
@@ -47,6 +48,7 @@ async function Engineer({ params }: Pick<PageProps<"/admin/engineers/[id]">, "pa
       .where(or(eq(schema.serviceAssignments.engineerId, id), eq(schema.serviceAssignments.previousEngineerId, id)))
       .orderBy(desc(schema.serviceAssignments.createdAt))
       .limit(20),
+    upcomingLeave(id),
   ]);
   const name = `${e.firstName} ${e.lastName}`.trim();
   const [{ total }] = await db.select({ total: sql<number>`count(*)::int` }).from(r).where(and(eq(r.assignedEngineerId, id), eq(r.status, "completed")));
@@ -164,6 +166,28 @@ async function Engineer({ params }: Pick<PageProps<"/admin/engineers/[id]">, "pa
           </Panel>
         </div>
         <div className="grid content-start gap-4">
+          <section className="rounded-xl border border-line p-4">
+            <h2 className="mb-3 text-sm font-medium text-fg">Leave</h2>
+            {leave.length ? (
+              <ul className="grid gap-2 text-sm">
+                {leave.map((l) => (
+                  <li key={l.id}>
+                    <span className="font-medium text-fg">{leaveDates(l)}</span> <Badge tone={l.status === "approved" ? "good" : l.status === "pending" ? "warn" : "bad"}>{l.status === "pending" ? "waiting" : l.status}</Badge>
+                    {l.reason && <span className="text-fg-muted"> · {l.reason}</span>}
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-sm text-fg-muted">No leave asked for.</p>
+            )}
+            <p className="mt-2 text-xs text-fg-dim">
+              Engineers ask for leave and an admin approves it in{" "}
+              <Link href="/admin/leave" className="underline">
+                Leave requests
+              </Link>
+              . Approved leave stops new jobs on those days; reassign their open jobs if needed.
+            </p>
+          </section>
           <section className="rounded-xl border border-line p-4">
             <h2 className="mb-3 text-sm font-medium text-fg">Job settings</h2>
             <EngineerSettingsForm userId={id} initial={{ isAvailable: profile?.isAvailable ?? true, skills: profile?.skills ?? [], takesOnSite: profile?.takesOnSite ?? true, notes: profile?.notes ?? "" }} />

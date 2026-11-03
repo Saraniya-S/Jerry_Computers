@@ -24,6 +24,8 @@ export type Draft = {
   /** "lat, lng" from the browser, only when the customer shared it. */
   pin: string;
   pinAccuracy: number | null;
+  /** A map link or "lat, lng" the customer pasted, e.g. from Google Maps on their phone. */
+  pastedLocation: string;
   preferredDate: string;
   preferredWindow: string;
   phone: string;

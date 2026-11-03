@@ -2,6 +2,7 @@ import "server-only";
 import { and, count, desc, eq, ilike, isNotNull, isNull, or, sql, type SQL } from "drizzle-orm";
 import { db, schema } from "../db";
 import type { User, UserRole } from "../db/schema";
+import { isPlaced } from "../orders";
 import { activeJobCount, ensureEngineerProfile, releaseEngineerJobs } from "./engineers";
 import { AdminError, audit } from "./tx";
 
@@ -116,7 +117,7 @@ export async function searchCustomers(f: CustomerQuery = {}) {
         lastLoginAt: schema.users.lastLoginAt,
         emailVerifiedAt: schema.users.emailVerifiedAt,
         disabledAt: schema.users.disabledAt,
-        orders: sql<number>`(select count(*)::int from ${schema.orders} where ${schema.orders.userId} = ${schema.users.id})`,
+        orders: sql<number>`(select count(*)::int from ${schema.orders} where ${schema.orders.userId} = ${schema.users.id} and ${isPlaced})`,
         serviceJobs: sql<number>`(select count(*)::int from ${schema.serviceRequests} where ${schema.serviceRequests.customerId} = ${schema.users.id})`,
       })
       .from(schema.users)

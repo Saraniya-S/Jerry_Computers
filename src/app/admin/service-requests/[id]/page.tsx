@@ -9,7 +9,9 @@ import { AssignmentOverride, NoteForm, ScheduleSetter, StatusChanger } from "@/c
 import { TransferDecision } from "@/components/admin/TransferDecision";
 import { Badge, fullDateTimeFmt } from "@/components/admin/ui";
 import { FormAlert } from "@/components/auth/ui";
-import { recordCollectionAction } from "@/app/admin/service-requests/actions";
+import { addJobHelperAction, recordCollectionAction, removeJobHelperAction } from "@/app/admin/service-requests/actions";
+import { JobTeam } from "@/components/admin/JobTeam";
+import { helperCandidates, jobTeam } from "@/lib/server/admin/job-team";
 import { CollectionsCard } from "@/components/admin/CollectionsCard";
 import { engineerWorkloads } from "@/lib/server/admin/assignment";
 import { listCollections } from "@/lib/server/admin/collections";
@@ -37,11 +39,15 @@ async function ServiceRequest({ params, searchParams }: Pick<PageProps<"/admin/s
   const [{ id }, { created }] = await Promise.all([params, searchParams]);
   const job = /^[0-9a-f-]{36}$/i.test(id) ? await getServiceRequest(id) : null;
   if (!job) notFound();
-  const [engineers, transfers, collections] = await Promise.all([
+  const [engineers, transfers, collections, team] = await Promise.all([
     engineerWorkloads(undefined, { deviceType: job.deviceType, location: job.location }),
     listTransfers({ requestId: job.id }),
     listCollections(job.id),
+    jobTeam(job.id),
   ]);
+  // Helpers can join while the job has a lead and is still being worked.
+  const teamOpen = Boolean(job.assignedEngineerId) && isActiveStatus(job.status);
+  const joinable = teamOpen ? await helperCandidates(job) : null;
   const ticket = serviceNumber(job.seq);
   const a = job.serviceAddress;
   const links = job.location === "on_site" ? locationLinks(a) : null;
@@ -219,6 +225,24 @@ async function ServiceRequest({ params, searchParams }: Pick<PageProps<"/admin/s
               />
             )}
           </section>
+
+          {(team.length > 0 || teamOpen) && (
+            <section className="grid gap-3 rounded-xl border border-line p-4 text-sm">
+              <div>
+                <h2 className="font-medium text-fg">Team</h2>
+                <p className="text-xs text-fg-dim">For work that needs more than one engineer. Helpers see the job and add to its report; the lead keeps the status.</p>
+              </div>
+              <JobTeam
+                requestId={job.id}
+                lead={job.engineerName ? { name: job.engineerName, phone: job.engineerPhone } : null}
+                members={team.map((m) => ({ engineerId: m.engineerId, name: `${m.firstName} ${m.lastName}`.trim(), phone: m.phone, reason: m.reason, since: fullDateTimeFmt.format(m.createdAt) }))}
+                candidates={joinable}
+                canRemove
+                onAdd={addJobHelperAction}
+                onRemove={removeJobHelperAction}
+              />
+            </section>
+          )}
 
           <section className="rounded-xl border border-line p-4 text-sm">
             <h2 className="mb-2 font-medium text-fg">Customer</h2>

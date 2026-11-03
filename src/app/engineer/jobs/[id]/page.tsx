@@ -7,7 +7,9 @@ import { PageHeader, PageSkeleton } from "@/components/account/PageHeader";
 import { PriorityBadge, ServiceStatusBadge } from "@/components/admin/ServiceBadges";
 import { Badge, fullDateTimeFmt } from "@/components/admin/ui";
 import { ScheduleForm, StatusForm, TransferForm, WorkNoteForm } from "@/components/engineer/JobActions";
-import { engineerCollectionAction } from "@/app/engineer/actions";
+import { addJobHelperAction, engineerCollectionAction, removeJobHelperAction } from "@/app/engineer/actions";
+import { JobTeam } from "@/components/admin/JobTeam";
+import { helperCandidates } from "@/lib/server/admin/job-team";
 import { CollectionsCard } from "@/components/admin/CollectionsCard";
 import { listCollections } from "@/lib/server/admin/collections";
 import { requireStaff } from "@/lib/server/auth";
@@ -34,13 +36,17 @@ export default function EngineerJobPage({ params }: PageProps<"/engineer/jobs/[i
 async function Job({ params }: Pick<PageProps<"/engineer/jobs/[id]">, "params">) {
   const me = await requireStaff(["engineer"]);
   const { id } = await params;
-  // Only found when the job is assigned to this engineer; anything else is a plain 404.
+  // Only found when this engineer leads the job or is helping on it; anything else is a plain 404.
   const job = /^[0-9a-f-]{36}$/i.test(id) ? await getMyJob(me.id, id) : null;
   if (!job) notFound();
-  const [candidates, shop, collections] = await Promise.all([
-    isActiveStatus(job.status) ? transferCandidates(me.id, job) : [],
+  const lead = job.isLead;
+  const open = isActiveStatus(job.status);
+  const [candidates, shop, collections, joinable] = await Promise.all([
+    open && lead ? transferCandidates(me.id, job) : [],
     job.location === "in_shop" ? getSettings("shop") : null,
     listCollections(job.id),
+    // The lead brings in colleagues who are free right now.
+    open && lead ? helperCandidates(job).then((c) => c.filter((e) => !e.note)) : null,
   ]);
   const pending = job.transfers.find((t) => t.t.status === "pending");
   const links = job.location === "on_site" ? locationLinks(job.serviceAddress) : null;
@@ -55,6 +61,7 @@ async function Job({ params }: Pick<PageProps<"/engineer/jobs/[id]">, "params">)
           <>
             {ticket} <ServiceStatusBadge status={job.status} /> <PriorityBadge priority={job.priority} />
             {pending && <Badge tone="warn">Transfer requested</Badge>}
+            {!lead && <Badge tone="info">Helping</Badge>}
           </>
         }
         description={`${deviceTypeLabel[job.deviceType]}${job.deviceBrand || job.deviceModel ? ` · ${[job.deviceBrand, job.deviceModel].filter(Boolean).join(" ")}` : ""} · ${job.location === "on_site" ? "on-site visit" : "in shop"}`}
@@ -85,7 +92,7 @@ async function Job({ params }: Pick<PageProps<"/engineer/jobs/[id]">, "params">)
               <Item k="Brand / model" v={[job.deviceBrand, job.deviceModel].filter(Boolean).join(" ") || "—"} />
               <Item k="Serial number" v={job.serialNumber ?? "—"} />
               <Item k="Left with the device" v={job.accessories ?? "—"} />
-              <Item k="Assigned to you" v={job.assignedAt ? fullDateTimeFmt.format(job.assignedAt) : "—"} />
+              <Item k={lead ? "Assigned to you" : "Lead engineer"} v={lead ? (job.assignedAt ? fullDateTimeFmt.format(job.assignedAt) : "—") : (job.leadName ?? "—")} />
               <Item k="Accepted" v={job.acceptedAt ? fullDateTimeFmt.format(job.acceptedAt) : "Not yet"} />
               <Item k="Scheduled" v={job.scheduledAt ? fullDateTimeFmt.format(job.scheduledAt) : "Not scheduled"} />
               <Item k="Logged" v={fullDateTimeFmt.format(job.createdAt)} />
@@ -151,13 +158,32 @@ async function Job({ params }: Pick<PageProps<"/engineer/jobs/[id]">, "params">)
             requestId={job.id}
             rows={collections.rows}
             totalPaise={collections.totalPaise}
-            canRecord={job.status !== "cancelled" && job.status !== "unable_to_complete"}
+            canRecord={lead && job.status !== "cancelled" && job.status !== "unable_to_complete"}
             canCorrect={false}
             onRecord={engineerCollectionAction}
           />
 
+          {(job.team.length > 0 || (open && lead)) && (
+            <Card title="Team">
+              <JobTeam
+                requestId={job.id}
+                lead={{ name: job.leadName ?? "—", phone: job.leadPhone, isYou: lead }}
+                members={job.team.map((m) => ({ engineerId: m.engineerId, name: `${m.firstName} ${m.lastName}`.trim(), phone: m.phone, reason: m.reason, since: fullDateTimeFmt.format(m.createdAt) }))}
+                candidates={joinable}
+                canRemove={lead}
+                selfId={me.id}
+                onAdd={addJobHelperAction}
+                onRemove={removeJobHelperAction}
+              />
+            </Card>
+          )}
+
           <Card title="Status">
-            {job.status === "unable_to_complete" ? (
+            {!lead ? (
+              <p className="text-fg-muted">
+                You&apos;re helping on this job. {job.leadName ?? "The lead engineer"} updates its status and schedule; add what you did to the work report.
+              </p>
+            ) : job.status === "unable_to_complete" ? (
               <p className="text-fg-muted">You handed this job back. An admin will reassign or cancel it.</p>
             ) : isClosedStatus(job.status) ? (
               <p className="text-fg-muted">This job is {serviceStatusLabel[job.status].toLowerCase()}.</p>
@@ -217,13 +243,13 @@ async function Job({ params }: Pick<PageProps<"/engineer/jobs/[id]">, "params">)
             {job.contactEmail && <p className="text-fg-muted">{job.contactEmail}</p>}
           </Card>
 
-          {isActiveStatus(job.status) && (
+          {open && lead && (
             <Card title="Schedule" icon={<CalendarClock className="size-4 text-brand" aria-hidden />}>
               <ScheduleForm requestId={job.id} current={job.scheduledAt} />
             </Card>
           )}
 
-          {(isActiveStatus(job.status) || job.transfers.length > 0) && (
+          {lead && (open || job.transfers.length > 0) && (
             <Card title="Transfer">
               {isActiveStatus(job.status) && (
                 <TransferForm requestId={job.id} candidates={candidates} pending={pending ? { id: pending.t.id, to: pending.to, createdAt: fullDateTimeFmt.format(pending.t.createdAt) } : null} />

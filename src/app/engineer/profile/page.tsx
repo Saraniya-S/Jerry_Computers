@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { eq } from "drizzle-orm";
 import { Suspense } from "react";
 import { PageHeader, PageSkeleton } from "@/components/account/PageHeader";
@@ -41,7 +42,13 @@ async function Profile() {
               {(profile?.takesOnSite ?? true) ? <Badge>On-site visits</Badge> : <Badge tone="muted">In-shop only</Badge>}
             </p>
             <p className="text-fg-muted">Devices: {profile?.skills.length ? profile.skills.map((s) => deviceTypeLabel[s]).join(", ") : "all types"}</p>
-            <p className="text-xs text-fg-dim">These decide which new jobs reach you, so an admin sets them. Ask the shop if they need changing.</p>
+            <p className="text-xs text-fg-dim">
+              An admin sets these. To ask for days off, use{" "}
+              <Link href="/engineer/leave" className="underline">
+                Leave
+              </Link>
+              .
+            </p>
           </section>
           <section className="grid gap-3 rounded-xl border border-line p-4 text-sm sm:p-5">
             <h2 className="font-medium text-fg">Password</h2>

@@ -2,7 +2,7 @@ import { and, eq } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
 import { recordShipmentEvent, updateShipmentDetails } from "@/lib/server/admin/shipments";
 import { db, schema } from "@/lib/server/db";
-import { addOrderNote, getOrder, orderTimeline, placeOrder, recordPayment, updateOrderStatus } from "@/lib/server/orders";
+import { addOrderNote, getOrder, orderTimeline, placeOrder, recordPayment, searchOrders, updateOrderStatus } from "@/lib/server/orders";
 import { ordersNeedingAction, staffMetrics } from "@/lib/server/staff/dashboard";
 import { makeOrder, makeProduct, makeUser, reset } from "./helpers";
 
@@ -74,7 +74,7 @@ describe("e-commerce staff order workflow", () => {
     const p = await makeProduct({ stock: 3 });
     const o = await makeOrder(customer.id, p, { paymentMethod: "online" });
     await recordPayment(o.id, "pay_77", null, { provider: "razorpay" });
-    await updateOrderStatus(o.id, "confirmed", staff.id);
+    expect((await getOrder(o.id))?.status).toBe("confirmed");
     await updateOrderStatus(o.id, "packed", staff.id);
     await updateOrderStatus(o.id, "shipped", staff.id, { shipment: ship() });
     const s = (await getOrder(o.id))!.shipments[0];
@@ -119,11 +119,14 @@ describe("e-commerce staff order workflow", () => {
     const a = await makeOrder(customer.id, await makeProduct());
     const b = await makeOrder(customer.id, await makeProduct(), { paymentMethod: "online" });
     const c = await makeOrder(customer.id, await makeProduct());
-    await updateOrderStatus(b.id, "confirmed", staff.id);
+    const d = await makeOrder(customer.id, await makeProduct());
+    // b is an unpaid online checkout, not an order: it isn't counted or listed anywhere.
+    await updateOrderStatus(a.id, "confirmed", staff.id);
     await updateOrderStatus(c.id, "cancelled", staff.id, { cancelReason: "Duplicate" });
     const m = await staffMetrics();
-    expect(m).toMatchObject({ total: 3, onlineToVerify: 1, codToCollect: 0 });
+    expect(m).toMatchObject({ total: 3, onlineToVerify: 0, codToCollect: 0 });
     expect(m.status).toMatchObject({ placed: 1, confirmed: 1, cancelled: 1 });
-    expect((await ordersNeedingAction()).map((o) => o.id).sort()).toEqual([a.id, b.id].sort());
+    expect((await ordersNeedingAction()).map((o) => o.id).sort()).toEqual([a.id, d.id].sort());
+    expect((await searchOrders()).rows.map((o) => o.id)).not.toContain(b.id);
   });
 });

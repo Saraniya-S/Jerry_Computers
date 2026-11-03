@@ -9,6 +9,7 @@ import { listAddresses } from "@/lib/server/customer";
 import { getServices } from "@/lib/server/services";
 import { getSessionUser } from "@/lib/server/session";
 import { getSettings } from "@/lib/server/settings";
+import { visitArea } from "@/lib/settings";
 
 export const metadata: Metadata = {
   title: "Request a service",
@@ -112,7 +113,7 @@ async function Dashboard({ searchParams }: Pick<PageProps<"/services/request">, 
   const list: RequestService[] = services.map((s) => ({ slug: s.slug, label: s.label, title: s.title, description: s.description, includes: s.includes, visual: s.visual }));
   const preselect = typeof sp.service === "string" && list.some((s) => s.slug === sp.service) ? sp.service : null;
 
-  return <RequestDashboard services={list} shop={shopInfo} account={account} signedInAsStaff={Boolean(user && user.role !== "customer")} preselect={preselect} />;
+  return <RequestDashboard services={list} shop={shopInfo} visitArea={visitArea(shop)} account={account} signedInAsStaff={Boolean(user && user.role !== "customer")} preselect={preselect} />;
 }
 
 function DashboardSkeleton() {

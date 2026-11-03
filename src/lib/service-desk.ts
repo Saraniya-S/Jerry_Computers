@@ -60,10 +60,10 @@ export const serviceFlow: Record<ServiceStatus, ServiceStatus[]> = {
 const engineerMoves: Record<ServiceStatus, ServiceStatus[]> = {
   open: [],
   assigned: ["accepted", "unable_to_complete"],
-  accepted: ["in_progress", "awaiting_customer", "unable_to_complete"],
+  accepted: ["in_progress", "awaiting_parts", "awaiting_customer", "completed", "unable_to_complete"],
   in_progress: ["awaiting_parts", "awaiting_customer", "completed", "unable_to_complete"],
-  awaiting_parts: ["in_progress", "unable_to_complete"],
-  awaiting_customer: ["in_progress", "unable_to_complete"],
+  awaiting_parts: ["in_progress", "completed", "unable_to_complete"],
+  awaiting_customer: ["in_progress", "completed", "unable_to_complete"],
   unable_to_complete: [],
   completed: [],
   cancelled: [],

@@ -1,22 +1,33 @@
 import { z } from "zod";
 import { indianStates } from "@/lib/customer";
+import { parsePin, type VisitArea } from "@/lib/service-location";
 
 /** Shop details and store rules edited from Admin → Settings. Shared by server and admin forms. */
 
-const text = (max: number) => z.string().trim().max(max).default("");
+const text = (max: number, fallback = "") => z.string().trim().max(max).default(fallback);
+
+/** Terms exactly as printed on the shop's existing bills. */
+export const DEFAULT_INVOICE_TERMS = [
+  "Goods once sold will not be taken back.",
+  "Interest @ 18% p.a. will be carged if the payment is not made with in the stipulated time.",
+  "Warranty Subject to manufacturer's terms and condition.",
+  "Physical Damage / Mishandling dose not cover under warranty.",
+  "Subject to 'Eraniel' Jurisdiction only.",
+];
 
 export const shopSchema = z.object({
   /** Name printed on invoices; defaults to the store name. */
   legalName: text(120),
-  address: text(300),
-  city: text(60),
-  state: z.union([z.enum(indianStates), z.literal("")]).default(""),
+  // Defaults are the shop's details from its existing bills, so invoices are right before Settings is saved.
+  address: text(300, "Door No.: 15/16, Near Roundana, Thingal Nagar, Neyoor"),
+  city: text(60, "Kanniyakumari District"),
+  state: z.union([z.enum(indianStates), z.literal("")]).default("Tamil Nadu"),
   postalCode: z
     .string()
     .trim()
     .refine((v) => v === "" || /^[1-9]\d{5}$/.test(v), "Enter a 6-digit PIN code.")
-    .default(""),
-  phone: text(30),
+    .default("629802"),
+  phone: text(30, "97912-30446, 97915-93446"),
   email: z.union([z.string().trim().email("Enter a valid email."), z.literal("")]).default(""),
   serviceEmail: z.union([z.string().trim().email("Enter a valid email."), z.literal("")]).default(""),
   gstin: z
@@ -24,9 +35,19 @@ export const shopSchema = z.object({
     .trim()
     .toUpperCase()
     .refine((v) => v === "" || /^\d{2}[A-Z]{5}\d{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/.test(v), "Enter a valid 15-character GSTIN.")
-    .default(""),
+    .default("33BEYPJ4897M2ZD"),
   mapUrl: z.union([z.string().trim().url("Enter a full link, starting https://"), z.literal("")]).default(""),
+  /** The shop's position, "lat, lng", for measuring on-site visit distances. Default: Neyoor post office. */
+  shopPin: z
+    .string()
+    .trim()
+    .refine((v) => v === "" || parsePin(v) !== null, "Enter it as latitude, longitude, e.g. 8.2030, 77.3056.")
+    .default("8.2030, 77.3056"),
+  /** How far beyond Kanniyakumari district engineers travel, in km (0 = the district only). */
+  visitRadiusKm: z.number().int("Use whole kilometres.").min(0, "Can't be negative.").max(100, "Up to 100 km.").default(20),
   hours: z.array(z.object({ days: text(40), hours: text(40) })).max(7).default([]),
+  /** Numbered terms printed at the foot of every invoice. */
+  invoiceTerms: z.array(z.string().trim().min(1).max(160)).max(8).default(DEFAULT_INVOICE_TERMS),
   social: z.array(z.object({ label: text(30), href: z.string().trim().url() })).max(8).default([]),
 });
 export type ShopSettings = z.infer<typeof shopSchema>;
@@ -92,3 +113,6 @@ export function shopContact(shop: ShopSettings) {
     social: shop.social,
   };
 }
+
+/** The shop's on-site visit area from its settings. */
+export const visitArea = (shop: ShopSettings): VisitArea => ({ shop: parsePin(shop.shopPin), radiusKm: shop.visitRadiusKm });
