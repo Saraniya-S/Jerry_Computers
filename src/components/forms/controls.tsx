@@ -6,7 +6,8 @@ import { useId, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttribu
 /** Labelled form controls (label above, hint or error below), used by onboarding and account settings. */
 
 const control =
-  "h-11 w-full rounded-xl border bg-ink-850 px-3.5 text-[0.95rem] text-fg placeholder:text-fg-dim transition-[border-color,box-shadow] focus:ring-4";
+  // 16px text on phones: iOS zooms the whole page in when a smaller field is tapped.
+  "h-11 w-full min-w-0 rounded-xl border bg-ink-850 px-3.5 text-base text-fg placeholder:text-fg-dim transition-[border-color,box-shadow] focus:ring-4 sm:text-[0.95rem]";
 const ok = "border-line-strong focus:border-brand focus:ring-[var(--brand-glow)]";
 const bad = "border-red-400 focus:border-red-500 focus:ring-red-500/15";
 
@@ -14,7 +15,8 @@ type FieldShellProps = { id: string; label: ReactNode; hint?: ReactNode; error?:
 
 export function FieldShell({ id, label, hint, error, optional, children }: FieldShellProps) {
   return (
-    <div>
+    // min-w-0: a field in a grid or flex row can shrink below a text box's natural width on small phones.
+    <div className="min-w-0">
       <label htmlFor={id} className="mb-1.5 flex items-baseline justify-between text-sm font-medium text-fg">
         {label}
         {optional && <span className="text-xs font-normal text-fg-dim">Optional</span>}
@@ -49,13 +51,13 @@ export function TextField({ label, hint, error, optional, prefix, className = ""
     <FieldShell id={id} label={label} hint={hint} error={error} optional={optional}>
       {prefix ? (
         <div className={`flex items-center overflow-hidden rounded-xl border bg-ink-850 focus-within:ring-4 ${error ? "border-red-400 focus-within:ring-red-500/15" : "border-line-strong focus-within:border-brand focus-within:ring-[var(--brand-glow)]"}`}>
-          <span className="flex h-11 items-center border-r border-line bg-ink-950 px-3 text-[0.95rem] text-fg-muted">{prefix}</span>
+          <span className="flex h-11 items-center border-r border-line bg-ink-950 px-3 text-base text-fg-muted sm:text-[0.95rem]">{prefix}</span>
           <input
             id={id}
             aria-invalid={error ? true : undefined}
             aria-describedby={describedBy}
             style={{ outline: "none" }}
-            className={`h-11 min-w-0 flex-1 bg-transparent px-3 text-[0.95rem] text-fg placeholder:text-fg-dim ${className}`}
+            className={`h-11 min-w-0 flex-1 bg-transparent px-3 text-base text-fg placeholder:text-fg-dim sm:text-[0.95rem] ${className}`}
             {...props}
           />
         </div>

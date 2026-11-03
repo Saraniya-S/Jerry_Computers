@@ -59,7 +59,7 @@ export function Field({ label, icon: Icon, trailing, error, className = "", ...p
             aria-describedby={error ? errorId : undefined}
             // The wrapper draws the focus ring; skip the global :focus-visible outline here.
             style={{ outline: "none" }}
-            className={`peer h-full w-full bg-transparent pb-1.5 pt-5 text-[0.95rem] text-fg outline-none ${Icon ? "pl-3" : "pl-4"} ${trailing ? "pr-1" : "pr-4"}`}
+            className={`peer h-full w-full bg-transparent pb-1.5 pt-5 text-base text-fg outline-none sm:text-[0.95rem] ${Icon ? "pl-3" : "pl-4"} ${trailing ? "pr-1" : "pr-4"}`}
             {...props}
           />
           <label

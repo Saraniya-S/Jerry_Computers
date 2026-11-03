@@ -31,7 +31,9 @@ async function Profile() {
   return (
     <>
       <PageHeader title="Profile & security" description="Your contact details and how you sign in." />
-      <div className="grid gap-8 p-5 sm:p-7 lg:grid-cols-[220px_1fr] lg:gap-10">
+      {/* minmax(0, …) keeps the column to the screen width, so long single-line text (an address, an
+          email) truncates instead of stretching every section past the edge on narrow phones. */}
+      <div className="grid grid-cols-[minmax(0,1fr)] gap-8 p-5 sm:p-7 lg:grid-cols-[220px_minmax(0,1fr)] lg:gap-10">
         <SectionIntro title="Contact details" text="Used on orders, invoices and service tickets." />
         <ProfileForm firstName={viewer.firstName} lastName={viewer.lastName} phone={mobileInputValue(viewer.phone)} />
 

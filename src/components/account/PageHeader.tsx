@@ -32,7 +32,7 @@ export function PageSkeleton() {
     <div className="animate-pulse" aria-busy="true" aria-label="Loading">
       <div className="border-b border-line px-5 py-5 sm:px-7">
         <div className="h-6 w-48 rounded bg-ink-900" />
-        <div className="mt-2 h-4 w-72 rounded bg-ink-900" />
+        <div className="mt-2 h-4 w-72 max-w-full rounded bg-ink-900" />
       </div>
       <div className="grid gap-4 p-5 sm:p-7 md:grid-cols-3">
         <div className="h-28 rounded-xl bg-ink-900" />
