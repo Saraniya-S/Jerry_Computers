@@ -1,13 +1,13 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { returnTo } from "@/lib/server/auth";
-import { googleEnabled } from "@/lib/server/env";
+import { googleEnabled, siteUrl } from "@/lib/server/env";
 import { GOOGLE_STATE_COOKIE, googleProfile, googleSignIn } from "@/lib/server/google";
 import { createSession } from "@/lib/server/session";
 
 /** Finishes Google sign-in for customers, e-commerce staff and admins (googleSignIn has the rules). */
 export async function GET(request: NextRequest) {
   const fail = (code: string) => {
-    const res = NextResponse.redirect(new URL(`/login?error=${code}`, request.url));
+    const res = NextResponse.redirect(siteUrl(`/login?error=${code}`));
     res.cookies.delete({ name: GOOGLE_STATE_COOKIE, path: "/api/auth/google" });
     return res;
   };
@@ -36,7 +36,7 @@ export async function GET(request: NextRequest) {
   const next = returnTo(user.role, saved.next);
   // New Google sign-ups go through the welcome steps first, then on to where they were going.
   const dest = !user.onboardedAt && isNew ? (next === "/account" ? "/onboarding" : `/onboarding?next=${encodeURIComponent(next)}`) : next;
-  const res = NextResponse.redirect(new URL(dest, request.url));
+  const res = NextResponse.redirect(siteUrl(dest));
   res.cookies.delete({ name: GOOGLE_STATE_COOKIE, path: "/api/auth/google" });
   return res;
 }

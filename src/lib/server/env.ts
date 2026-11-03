@@ -26,6 +26,12 @@ const schema = z.object({
 /** Server configuration, validated once on first use. See .env.example. */
 export const env = schema.parse(process.env);
 
+/**
+ * An absolute link on the public site. Route handlers behind the reverse proxy see their own
+ * internal address (http://localhost:3000) in request.url, so redirects are built from APP_URL.
+ */
+export const siteUrl = (path: string) => new URL(path, env.APP_URL);
+
 export const googleEnabled = Boolean(env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET);
 
 /** Online payments need both API keys; without them checkout offers cash on delivery only. */
